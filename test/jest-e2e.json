@@ -1,0 +1,14 @@
+{
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "rootDir": ".",
+  "testEnvironment": "node",
+  "testRegex": "\\.(e2e-spec|integration\\.spec)\\.ts$",
+  "transform": {
+    "^.+\\.(t|j)s$": "ts-jest"
+  },
+  "transformIgnorePatterns": [
+    "node_modules/(?!(p-map|p-limit|p-queue|p-retry|p-defer|p-timeout|p-finally|p-cancelable|p-locate|p-try|p-reduce|eventemitter3|get-port|is-stream|fetch-blob|node-domexception|formdata-polyfill|web-streams-polyfill|@sindresorhus|chalk|strip-ansi|ansi-regex|string-width|wrap-ansi|cliui|yargs)/)"
+  ],
+  "testTimeout": 90000,
+  "forceExit": true
+}

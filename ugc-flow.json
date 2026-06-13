@@ -1,0 +1,114 @@
+{
+  "name": "UGC Creator Outreach",
+  "description": "Scrape brand site, find Meta ads, research brand identity, find Instagram creators via hashtag search, DM them",
+  "steps": [
+    {
+      "ref": "trigger",
+      "type": "trigger/manual",
+      "name": "Start Outreach",
+      "position": 0,
+      "config": {
+        "inputSchema": {
+          "properties": {
+            "websiteUrl": { "type": "string", "description": "Brand website URL e.g. https://brand.com" },
+            "metaPageId": { "type": "string", "description": "Facebook Page ID of the brand" }
+          }
+        }
+      },
+      "onSuccess": "brand-research",
+      "onFailure": null
+    },
+    {
+      "ref": "brand-research",
+      "type": "brand-research",
+      "name": "Research Brand",
+      "position": 1,
+      "config": {
+        "websiteUrl": "$.input.websiteUrl",
+        "extraPaths": ["/about", "/products"]
+      },
+      "onSuccess": "meta-ads",
+      "onFailure": null
+    },
+    {
+      "ref": "meta-ads",
+      "type": "meta-ads-search",
+      "name": "Find Meta Ads",
+      "position": 2,
+      "config": {
+        "pageIdPath": "$.input.metaPageId",
+        "countries": ["US"],
+        "limit": 20
+      },
+      "onSuccess": "find-creators",
+      "onFailure": null
+    },
+    {
+      "ref": "find-creators",
+      "type": "agent",
+      "name": "Find Instagram Creators",
+      "position": 3,
+      "config": {
+        "agentName": "ugcResearchAgent",
+        "promptTemplate": "You are a UGC creator sourcing specialist.\n\nBrand profile:\n{{$.steps.brand-research.title}} - {{$.steps.brand-research.description}}\nTarget audience: {{$.steps.brand-research.targetAudience}}\nTone: {{$.steps.brand-research.tone}}\n\nMeta UGC-style ads:\n{{$.steps.meta-ads.ugcAds}}\n\nHandles already seen in ads:\n{{$.steps.meta-ads.handles}}\n\nYour job:\n1. Pick 3-5 relevant Instagram hashtags based on the brand niche and target audience.\n2. For each hashtag, call search_instagram_creators to get real creator handles from actual posts.\n3. For each discovered handle, call instagram_profile to fetch their follower count, bio, and niche.\n4. Filter to creators with 5k-500k followers who match the brand tone and audience.\n5. Return a JSON array of the top 5 creators with fields: handle, recipientId, followerCount, bio, niche, whyFit.",
+        "tools": [
+          {
+            "name": "search_instagram_creators",
+            "type": "builtin",
+            "builtinId": "search-instagram-creators",
+            "description": "Scrape an Instagram hashtag page to discover real creator handles from recent posts",
+            "inputSchema": {
+              "properties": {
+                "hashtag": { "type": "string", "description": "Hashtag to search e.g. skincare or fitness (without #)" },
+                "limit": { "type": "number", "description": "Max handles to return (default 20)" }
+              }
+            }
+          },
+          {
+            "name": "instagram_profile",
+            "type": "builtin",
+            "builtinId": "instagram-profile",
+            "description": "Fetch an Instagram profile to get follower count, bio, and verify niche fit",
+            "inputSchema": {
+              "properties": {
+                "handle": { "type": "string", "description": "Instagram username without @" }
+              }
+            }
+          }
+        ],
+        "threadIdPath": null,
+        "resourceIdPath": "$.tenantId"
+      },
+      "onSuccess": "send-dms",
+      "onFailure": null
+    },
+    {
+      "ref": "send-dms",
+      "type": "agent",
+      "name": "Send DMs to Creators",
+      "position": 4,
+      "config": {
+        "agentName": "ugcOutreachAgent",
+        "promptTemplate": "You are a UGC outreach specialist.\n\nBrand: {{$.steps.brand-research.title}}\nDescription: {{$.steps.brand-research.description}}\nTone: {{$.steps.brand-research.tone}}\n\nCreators to contact:\n{{$.steps.find-creators.text}}\n\nFor each creator, write a personalised DM that:\n- Mentions something specific about their content or niche\n- Introduces the brand in 1 sentence\n- Pitches the UGC collab opportunity\n- Ends with a soft CTA\n- Is under 300 characters total\n\nThen call send_instagram_dm for each creator with their recipientId and the crafted message.",
+        "tools": [
+          {
+            "name": "send_instagram_dm",
+            "type": "builtin",
+            "builtinId": "send-instagram-dm",
+            "description": "Send an Instagram DM to a creator",
+            "inputSchema": {
+              "properties": {
+                "recipientId": { "type": "string", "description": "Instagram user ID" },
+                "message": { "type": "string", "description": "DM message text under 300 chars" }
+              }
+            }
+          }
+        ],
+        "threadIdPath": null,
+        "resourceIdPath": "$.tenantId"
+      },
+      "onSuccess": null,
+      "onFailure": null
+    }
+  ]
+}
