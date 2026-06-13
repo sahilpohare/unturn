@@ -100,3 +100,33 @@ export async function createTenant(name: string, slug: string): Promise<Tenant> 
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
+
+export type CredentialKey =
+  | 'metaAccessToken'
+  | 'instagramAccessToken'
+  | 'instagramUserId'
+  | 'openaiApiKey'
+  | 'openaiModel';
+
+export const CREDENTIAL_LABELS: Record<CredentialKey, string> = {
+  metaAccessToken: 'Meta Access Token',
+  instagramAccessToken: 'Instagram Access Token',
+  instagramUserId: 'Instagram Business Account ID',
+  openaiApiKey: 'OpenAI API Key',
+  openaiModel: 'OpenAI Model (e.g. openai/gpt-4o-mini)',
+};
+
+export async function getCredentials(tid: string): Promise<Record<CredentialKey, string>> {
+  const r = await fetch(`${BASE}/tenants/${tid}/credentials`, { headers: headers() });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function updateCredentials(tid: string, body: Partial<Record<CredentialKey, string>>): Promise<void> {
+  const r = await fetch(`${BASE}/tenants/${tid}/credentials`, {
+    method: 'PATCH',
+    headers: headers(),
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(await r.text());
+}

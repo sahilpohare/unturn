@@ -2,6 +2,9 @@ import { useState } from 'react';
 import type { Flow } from './types';
 import * as api from './api';
 import { TenantSwitcher } from './TenantSwitcher';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface Props {
   flows: Flow[];
@@ -11,9 +14,10 @@ interface Props {
   selectedStep: string | null;
   onLogout: () => void;
   onAddStep: () => void;
+  onOpenCredentials: () => void;
 }
 
-export function Sidebar({ flows, selectedFlow, onSelectFlow, onRefresh, selectedStep, onLogout, onAddStep }: Props) {
+export function Sidebar({ flows, selectedFlow, onSelectFlow, onRefresh, selectedStep, onLogout, onAddStep, onOpenCredentials }: Props) {
   const [currentTenantId, setCurrentTenantId] = useState('');
   const [newFlowName, setNewFlowName] = useState('');
   const [executing, setExecuting] = useState(false);
@@ -38,7 +42,6 @@ export function Sidebar({ flows, selectedFlow, onSelectFlow, onRefresh, selected
 
   function openRunModal() {
     if (!selectedFlow) return;
-    // Seed args from trigger inputSchema
     const trigger = selectedFlow.steps?.find((s) => s.type.startsWith('trigger/'));
     const props = (trigger?.config as any)?.inputSchema?.properties ?? {};
     const defaults: Record<string, string> = {};
@@ -71,87 +74,135 @@ export function Sidebar({ flows, selectedFlow, onSelectFlow, onRefresh, selected
   const step = selectedFlow?.steps.find((s) => s.ref === selectedStep);
 
   return (
-    <div style={{
-      width: 280, background: '#13131f', display: 'flex', flexDirection: 'column',
-      borderRight: '1px solid #2a2a3e', fontFamily: 'sans-serif', overflow: 'hidden',
-    }}>
+    <div className="flex flex-col h-full w-[272px] flex-shrink-0" style={{ background: 'var(--bg-base)', borderRight: '1px solid var(--border-mid)' }}>
       {/* Header */}
-      <div style={{ padding: '14px 16px', borderBottom: '1px solid #2a2a3e', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 18 }}>⚡</span>
-          <span style={{ color: '#e2e8f0', fontWeight: 700, fontSize: 15 }}>Unturn</span>
+      <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid var(--border-mid)' }}>
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded flex items-center justify-center" style={{ background: 'var(--accent-glow)' }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--accent)' }}>
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+            </svg>
+          </div>
+          <span className="font-semibold text-sm tracking-tight" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>Unturn</span>
         </div>
-        <button onClick={onLogout} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 12 }}>
-          Sign out
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={onOpenCredentials}
+            title="API Credentials"
+            className="w-7 h-7 rounded flex items-center justify-center transition-colors"
+            style={{ color: 'var(--text-muted)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)'; }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="8" cy="15" r="4" />
+              <path d="M10.85 12.15 19 4" />
+              <path d="M18 5l2 2" />
+              <path d="M15 8l2 2" />
+            </svg>
+          </button>
+          <button
+            onClick={onLogout}
+            className="px-2 py-1 rounded text-xs transition-colors"
+            style={{ color: 'var(--text-muted)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.background = 'var(--bg-hover)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'transparent'; }}
+          >
+            Sign out
+          </button>
+        </div>
       </div>
 
       {/* Tenant switcher */}
-      <div style={{ padding: 16, borderBottom: '1px solid #2a2a3e' }}>
-        <div style={{ color: '#94a3b8', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
-          Tenant
-        </div>
+      <div className="px-3 py-3" style={{ borderBottom: '1px solid var(--border-mid)' }}>
+        <div className="text-[10px] font-semibold uppercase tracking-widest mb-2" style={{ color: 'var(--text-muted)' }}>Workspace</div>
         <TenantSwitcher currentTenantId={currentTenantId} onSwitch={handleTenantSwitch} />
       </div>
 
       {/* Flow list */}
-      <div style={{ padding: 16, borderBottom: '1px solid #2a2a3e', flex: 0 }}>
-        <div style={{ color: '#94a3b8', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
-          Flows
-        </div>
-        <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-          <input
+      <div className="px-3 py-3" style={{ borderBottom: '1px solid var(--border-mid)' }}>
+        <div className="text-[10px] font-semibold uppercase tracking-widest mb-2" style={{ color: 'var(--text-muted)' }}>Flows</div>
+        <div className="flex gap-2 mb-2">
+          <Input
             placeholder="New flow name"
             value={newFlowName}
             onChange={(e) => setNewFlowName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-            style={{ ...inputStyle, flex: 1, margin: 0 }}
+            className="h-7 text-xs flex-1"
+            style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', color: 'var(--text-primary)' }}
           />
-          <button onClick={handleCreate} style={{ ...btnStyle('#059669'), padding: '6px 10px', margin: 0, flex: 'none' }}>+</button>
+          <Button onClick={handleCreate} size="icon-sm" style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-mid)', color: 'var(--text-secondary)', flexShrink: 0 }}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
+          </Button>
         </div>
-        <div style={{ maxHeight: 200, overflowY: 'auto' }}>
-          {flows.length === 0 && (
-            <div style={{ color: '#475569', fontSize: 12, textAlign: 'center', padding: '12px 0' }}>
-              Enter a tenant ID to load flows.
+
+        <ScrollArea className="max-h-48">
+          {flows.length === 0 ? (
+            <div className="text-xs text-center py-4" style={{ color: 'var(--text-muted)' }}>
+              Select a workspace to load flows.
+            </div>
+          ) : (
+            <div className="space-y-0.5">
+              {flows.map((f) => (
+                <div
+                  key={f.id}
+                  onClick={() => onSelectFlow(f)}
+                  className="px-2.5 py-2 rounded-lg cursor-pointer transition-all group"
+                  style={{
+                    background: selectedFlow?.id === f.id ? 'var(--bg-hover)' : 'transparent',
+                    border: `1px solid ${selectedFlow?.id === f.id ? 'var(--border-hi)' : 'transparent'}`,
+                  }}
+                  onMouseEnter={(e) => { if (selectedFlow?.id !== f.id) e.currentTarget.style.background = 'var(--bg-elevated)'; }}
+                  onMouseLeave={(e) => { if (selectedFlow?.id !== f.id) e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <div className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>{f.name}</div>
+                  <div className="text-[10px] mt-0.5" style={{ color: statusColor(f.status) }}>{f.status}</div>
+                </div>
+              ))}
             </div>
           )}
-          {flows.map((f) => (
-            <div
-              key={f.id}
-              onClick={() => onSelectFlow(f)}
-              style={{
-                padding: '8px 10px', borderRadius: 6, cursor: 'pointer', marginBottom: 4,
-                background: selectedFlow?.id === f.id ? '#2563eb22' : '#1e1e2e',
-                border: `1px solid ${selectedFlow?.id === f.id ? '#2563eb' : 'transparent'}`,
-              }}
-            >
-              <div style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 500 }}>{f.name}</div>
-              <div style={{ color: statusColor(f.status), fontSize: 11, marginTop: 2 }}>{f.status}</div>
-            </div>
-          ))}
-        </div>
+        </ScrollArea>
       </div>
 
       {/* Selected flow actions */}
       {selectedFlow && (
-        <div style={{ padding: 16, borderBottom: '1px solid #2a2a3e' }}>
-          <div style={{ color: '#94a3b8', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+        <div className="px-3 py-3" style={{ borderBottom: '1px solid var(--border-mid)' }}>
+          <div className="text-[10px] font-semibold uppercase tracking-widest mb-1" style={{ color: 'var(--text-muted)' }}>
             {selectedFlow.name}
           </div>
-          <div style={{ color: '#64748b', fontSize: 11, marginBottom: 10 }}>
+          <div className="text-[10px] mb-3" style={{ color: 'var(--text-muted)' }}>
             {selectedFlow.steps?.length ?? 0} steps · {selectedFlow.status}
           </div>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-            <button onClick={onAddStep} style={btnStyle('#2563eb')}>+ Step</button>
-            <button onClick={openRunModal} disabled={executing || selectedFlow.status !== 'active'} style={btnStyle('#059669')}>
-              {executing ? '...' : '▶ Run'}
-            </button>
+          <div className="flex gap-2 mb-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onAddStep}
+              className="flex-1 h-7 text-xs"
+              style={{ borderColor: 'var(--border-mid)', color: 'var(--text-secondary)', background: 'var(--bg-elevated)' }}
+            >
+              + Step
+            </Button>
+            <Button
+              size="sm"
+              onClick={openRunModal}
+              disabled={executing || selectedFlow.status !== 'active'}
+              className="flex-1 h-7 text-xs"
+              style={{ background: 'var(--success)', color: '#fff', opacity: selectedFlow.status !== 'active' ? 0.4 : 1 }}
+            >
+              {executing ? '…' : 'Run'}
+            </Button>
           </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={handleDelete} style={btnStyle('#dc2626')}>Delete flow</button>
-          </div>
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={handleDelete}
+            className="w-full h-7 text-xs"
+          >
+            Delete flow
+          </Button>
           {lastExecution && (
-            <div style={{ color: '#22c55e', fontSize: 10, marginTop: 8, wordBreak: 'break-all' }}>
+            <div className="text-[10px] mt-2 break-all" style={{ color: 'var(--success)' }}>
               Started: {lastExecution}
             </div>
           )}
@@ -164,43 +215,56 @@ export function Sidebar({ flows, selectedFlow, onSelectFlow, onRefresh, selected
         const props = (trigger?.config as any)?.inputSchema?.properties ?? {};
         const keys = Object.keys(props);
         return (
-          <div style={{
-            position: 'fixed', inset: 0, background: '#0009', zIndex: 100,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }} onClick={() => setRunModalOpen(false)}>
-            <div style={{
-              background: '#13131f', border: '1px solid #2a2a3e', borderRadius: 12,
-              padding: 24, width: 400, display: 'flex', flexDirection: 'column', gap: 14,
-            }} onClick={(e) => e.stopPropagation()}>
-              <div style={{ color: '#e2e8f0', fontWeight: 700, fontSize: 15 }}>
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center"
+            style={{ background: 'rgba(0,0,0,0.7)' }}
+            onClick={() => setRunModalOpen(false)}
+          >
+            <div
+              className="rounded-xl w-[400px] flex flex-col gap-4 p-6"
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border-mid)', boxShadow: '0 24px 64px #000c' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
                 Run: {selectedFlow.name}
               </div>
               {keys.length === 0 && (
-                <div style={{ color: '#64748b', fontSize: 13 }}>No input args defined on trigger.</div>
+                <div className="text-xs" style={{ color: 'var(--text-muted)' }}>No input args defined on trigger.</div>
               )}
               {keys.map((key) => (
                 <div key={key}>
-                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--text-secondary)' }}>
                     {key}
                     {props[key].description && (
-                      <span style={{ color: '#475569', marginLeft: 6 }}>— {props[key].description}</span>
+                      <span className="ml-2 font-normal lowercase normal-case" style={{ color: 'var(--text-muted)' }}>— {props[key].description}</span>
                     )}
                   </div>
-                  <input
+                  <Input
                     value={runArgs[key] ?? ''}
                     onChange={(e) => setRunArgs((prev) => ({ ...prev, [key]: e.target.value }))}
                     placeholder={props[key].description ?? key}
-                    style={inputStyle}
+                    className="text-xs h-8"
+                    style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', color: 'var(--text-primary)' }}
                   />
                 </div>
               ))}
-              <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                <button onClick={() => setRunModalOpen(false)} style={{ ...btnStyle('#1e1e2e'), border: '1px solid #2a2a3e' }}>
+              <div className="flex gap-2 mt-1">
+                <Button
+                  variant="outline"
+                  className="flex-1 h-8 text-xs"
+                  onClick={() => setRunModalOpen(false)}
+                  style={{ borderColor: 'var(--border-mid)', color: 'var(--text-secondary)', background: 'var(--bg-elevated)' }}
+                >
                   Cancel
-                </button>
-                <button onClick={handleExecute} disabled={executing} style={btnStyle('#059669')}>
-                  {executing ? 'Starting…' : '▶ Run'}
-                </button>
+                </Button>
+                <Button
+                  className="flex-1 h-8 text-xs"
+                  onClick={handleExecute}
+                  disabled={executing}
+                  style={{ background: 'var(--success)', color: '#fff' }}
+                >
+                  {executing ? 'Starting…' : 'Run'}
+                </Button>
               </div>
             </div>
           </div>
@@ -209,66 +273,57 @@ export function Sidebar({ flows, selectedFlow, onSelectFlow, onRefresh, selected
 
       {/* Step inspector */}
       {step && (
-        <div style={{ padding: 16, flex: 1, overflowY: 'auto' }}>
-          <div style={{ color: '#94a3b8', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+        <ScrollArea className="flex-1 px-3 py-3">
+          <div className="text-[10px] font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--text-muted)' }}>
             Step Inspector
           </div>
-          <Field label="Name" value={step.name} />
-          <Field label="Type" value={step.type} />
-          <Field label="Ref" value={step.ref} />
-          <Field label="Position" value={String(step.position)} />
-          {step.onSuccess && <Field label="On Success" value={step.onSuccess} color="#22c55e" />}
-          {step.onFailure && <Field label="On Failure" value={step.onFailure} color="#ef4444" />}
-          <div style={{ color: '#94a3b8', fontSize: 11, marginTop: 10, marginBottom: 4 }}>Config</div>
-          <pre style={{
-            background: '#1e1e2e', borderRadius: 6, padding: 10, fontSize: 11,
-            color: '#94a3b8', overflow: 'auto', maxHeight: 200, margin: 0,
-          }}>
+          <div className="space-y-2">
+            <Field label="Name" value={step.name} />
+            <Field label="Type" value={step.type} />
+            <Field label="Ref" value={step.ref} />
+            <Field label="Position" value={String(step.position)} />
+            {step.onSuccess && <Field label="On Success" value={step.onSuccess} color="var(--success)" />}
+            {step.onFailure && <Field label="On Failure" value={step.onFailure} color="var(--danger)" />}
+            <Field
+              label="Retries"
+              value={`${step.retryPolicy?.maximumAttempts ?? 3} × ${step.retryPolicy?.initialInterval ?? '1s'}`}
+              color="var(--warning)"
+            />
+          </div>
+          <div className="text-[10px] font-semibold uppercase tracking-wide mt-4 mb-1.5" style={{ color: 'var(--text-muted)' }}>Config</div>
+          <pre className="rounded-lg p-3 text-[10px] overflow-auto max-h-48" style={{ background: 'var(--bg-void)', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
             {JSON.stringify(step.config, null, 2)}
           </pre>
-        </div>
+        </ScrollArea>
       )}
 
       {/* Footer */}
-      <div style={{ padding: 12, borderTop: '1px solid #2a2a3e', marginTop: 'auto' }}>
+      <div className="px-3 py-3 mt-auto" style={{ borderTop: '1px solid var(--border-mid)' }}>
         <a
           href="/api/docs"
           target="_blank"
           rel="noreferrer"
-          style={{ color: '#3b82f6', fontSize: 12, textDecoration: 'none' }}
+          className="text-xs hover:underline"
+          style={{ color: 'var(--text-muted)' }}
         >
-          📖 API Docs (Swagger) ↗
+          API Docs (Swagger)
         </a>
       </div>
     </div>
   );
 }
 
-function Field({ label, value, color = '#e2e8f0' }: { label: string; value: string; color?: string }) {
+function Field({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
-    <div style={{ marginBottom: 6 }}>
-      <span style={{ color: '#64748b', fontSize: 11 }}>{label}: </span>
-      <span style={{ color, fontSize: 12 }}>{value}</span>
+    <div className="flex items-baseline gap-1.5">
+      <span className="text-[10px] flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{label}</span>
+      <span className="text-xs font-mono truncate" style={{ color: color ?? 'var(--text-primary)' }}>{value}</span>
     </div>
   );
 }
 
 function statusColor(s: string) {
-  if (s === 'active') return '#22c55e';
-  if (s === 'disabled') return '#ef4444';
-  return '#94a3b8';
-}
-
-const inputStyle: React.CSSProperties = {
-  width: '100%', background: '#1e1e2e', border: '1px solid #2a2a3e',
-  borderRadius: 6, padding: '6px 10px', color: '#e2e8f0', fontSize: 13,
-  outline: 'none', boxSizing: 'border-box',
-};
-
-function btnStyle(bg: string): React.CSSProperties {
-  return {
-    background: bg, color: '#fff', border: 'none', borderRadius: 6,
-    padding: '7px 12px', cursor: 'pointer', fontSize: 13, fontWeight: 500,
-    flex: 1,
-  };
+  if (s === 'active') return 'var(--success)';
+  if (s === 'disabled') return 'var(--danger)';
+  return 'var(--text-muted)';
 }

@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 interface Props {
   onLogin: (token: string) => void;
@@ -54,122 +57,112 @@ export function LoginPage({ onLogin }: Props) {
   }
 
   return (
-    <div style={{
-      display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center',
-      background: '#0f0f1a', fontFamily: 'sans-serif',
-    }}>
-      <div style={{
-        background: '#13131f', border: '1px solid #2a2a3e', borderRadius: 12,
-        padding: 40, width: 360,
-      }}>
-        {/* Logo / Title */}
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <div style={{ fontSize: 28, marginBottom: 6 }}>⚡</div>
-          <div style={{ color: '#e2e8f0', fontSize: 22, fontWeight: 700 }}>Unturn</div>
-          <div style={{ color: '#64748b', fontSize: 13, marginTop: 4 }}>Flow automation platform</div>
+    <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-void)' }}>
+      {/* Background grid */}
+      <div className="absolute inset-0 pointer-events-none" style={{
+        backgroundImage: 'linear-gradient(var(--border-mid) 1px, transparent 1px), linear-gradient(90deg, var(--border-mid) 1px, transparent 1px)',
+        backgroundSize: '48px 48px',
+        opacity: 0.3,
+      }} />
+
+      <div className="relative w-full max-w-sm px-6">
+        {/* Logo */}
+        <div className="text-center mb-10">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl mb-4" style={{ background: 'var(--accent-glow)', border: '1px solid var(--accent)' }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--accent)' }}>
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-semibold tracking-tight" style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}>
+            Unturn
+          </h1>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
+            Flow automation platform
+          </p>
         </div>
 
-        {/* Mode toggle */}
-        <div style={{ display: 'flex', background: '#1e1e2e', borderRadius: 8, padding: 4, marginBottom: 24 }}>
-          {(['login', 'signup'] as const).map((m) => (
-            <button
-              key={m}
-              onClick={() => { setMode(m); setError(''); }}
-              style={{
-                flex: 1, padding: '7px 0', border: 'none', borderRadius: 6, cursor: 'pointer',
-                fontSize: 13, fontWeight: 600,
-                background: mode === m ? '#2563eb' : 'transparent',
-                color: mode === m ? '#fff' : '#64748b',
-                transition: 'all 0.15s',
-              }}
-            >
-              {m === 'login' ? 'Sign In' : 'Sign Up'}
-            </button>
-          ))}
-        </div>
+        {/* Card */}
+        <div className="rounded-xl p-6" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-mid)' }}>
+          {/* Mode toggle */}
+          <div className="flex rounded-lg p-0.5 mb-6" style={{ background: 'var(--bg-elevated)' }}>
+            {(['login', 'signup'] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => { setMode(m); setError(''); }}
+                className="flex-1 py-1.5 text-sm font-medium rounded-md transition-all"
+                style={{
+                  background: mode === m ? 'var(--bg-card)' : 'transparent',
+                  color: mode === m ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  border: mode === m ? '1px solid var(--border-mid)' : '1px solid transparent',
+                }}
+              >
+                {m === 'login' ? 'Sign In' : 'Sign Up'}
+              </button>
+            ))}
+          </div>
 
-        <form onSubmit={handleSubmit}>
-          {mode === 'signup' && (
-            <div style={{ marginBottom: 14 }}>
-              <label style={labelStyle}>Name</label>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Your name"
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {mode === 'signup' && (
+              <div className="space-y-1.5">
+                <Label style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Name</Label>
+                <Input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Your name"
+                  required
+                  style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', color: 'var(--text-primary)' }}
+                />
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Email</Label>
+              <Input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
                 required
-                style={inputStyle}
+                style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', color: 'var(--text-primary)' }}
               />
             </div>
-          )}
 
-          <div style={{ marginBottom: 14 }}>
-            <label style={labelStyle}>Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              required
-              style={inputStyle}
-            />
-          </div>
-
-          <div style={{ marginBottom: 20 }}>
-            <label style={labelStyle}>Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              required
-              style={inputStyle}
-            />
-          </div>
-
-          {error && (
-            <div style={{
-              background: '#dc262622', border: '1px solid #dc2626', borderRadius: 6,
-              padding: '8px 12px', color: '#fca5a5', fontSize: 13, marginBottom: 16,
-            }}>
-              {error}
+            <div className="space-y-1.5">
+              <Label style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Password</Label>
+              <Input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', color: 'var(--text-primary)' }}
+              />
             </div>
-          )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              width: '100%', padding: '10px 0', background: '#2563eb', color: '#fff',
-              border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600,
-              cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1,
-            }}
-          >
-            {loading ? 'Please wait…' : mode === 'login' ? 'Sign In' : 'Create Account'}
-          </button>
-        </form>
+            {error && (
+              <div className="rounded-lg px-3 py-2 text-sm" style={{ background: '#ef444412', border: '1px solid #ef444440', color: '#fca5a5' }}>
+                {error}
+              </div>
+            )}
 
-        <div style={{ textAlign: 'center', marginTop: 20 }}>
+            <Button type="submit" disabled={loading} className="w-full mt-2" style={{ background: 'var(--text-primary)', color: 'var(--bg-void)' }}>
+              {loading ? 'Please wait…' : mode === 'login' ? 'Sign In' : 'Create Account'}
+            </Button>
+          </form>
+        </div>
+
+        <div className="text-center mt-5">
           <a
             href="/api/docs"
             target="_blank"
             rel="noreferrer"
-            style={{ color: '#3b82f6', fontSize: 12, textDecoration: 'none' }}
+            className="text-xs hover:underline"
+            style={{ color: 'var(--text-muted)' }}
           >
-            📖 API Docs ↗
+            API Docs
           </a>
         </div>
       </div>
     </div>
   );
 }
-
-const labelStyle: React.CSSProperties = {
-  display: 'block', color: '#94a3b8', fontSize: 12, fontWeight: 600,
-  textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6,
-};
-
-const inputStyle: React.CSSProperties = {
-  width: '100%', background: '#1e1e2e', border: '1px solid #2a2a3e',
-  borderRadius: 8, padding: '9px 12px', color: '#e2e8f0', fontSize: 14,
-  outline: 'none', boxSizing: 'border-box',
-};

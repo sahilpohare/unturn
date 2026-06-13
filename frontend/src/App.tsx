@@ -4,6 +4,7 @@ import { FlowCanvas } from './FlowCanvas';
 import { Sidebar } from './Sidebar';
 import { LoginPage } from './LoginPage';
 import { AddStepPanel } from './AddStepPanel';
+import { CredentialsPanel } from './CredentialsPanel';
 import * as api from './api';
 import type { Flow, Step } from './types';
 
@@ -14,6 +15,7 @@ export default function App() {
   const [selectedStep, setSelectedStep] = useState<string | null>(null);
   const [addingStep, setAddingStep] = useState(false);
   const [editingStep, setEditingStep] = useState<Step | null>(null);
+  const [showCredentials, setShowCredentials] = useState(false);
 
   function handleLogin(t: string) {
     sessionStorage.setItem('token', t);
@@ -61,7 +63,7 @@ export default function App() {
   if (!token) return <LoginPage onLogin={handleLogin} />;
 
   return (
-    <div style={{ display: 'flex', height: '100vh', background: '#0f0f1a', overflow: 'hidden' }}>
+    <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bg-void)' }}>
       <Sidebar
         flows={flows}
         selectedFlow={selectedFlow}
@@ -70,6 +72,7 @@ export default function App() {
         selectedStep={selectedStep}
         onLogout={handleLogout}
         onAddStep={() => setAddingStep(true)}
+        onOpenCredentials={() => setShowCredentials(true)}
       />
       <ReactFlowProvider>
         <FlowCanvas
@@ -94,6 +97,13 @@ export default function App() {
           editStep={editingStep}
           onClose={() => setEditingStep(null)}
           onSaved={handleStepSaved}
+        />
+      )}
+
+      {showCredentials && (
+        <CredentialsPanel
+          tenantId={api.getTenantId()}
+          onClose={() => setShowCredentials(false)}
         />
       )}
     </div>

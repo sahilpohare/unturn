@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { listTenants, createTenant, setTenantId, type Tenant } from './api';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 interface Props {
   onSwitch: (tenantId: string) => void;
@@ -19,7 +21,6 @@ export function TenantSwitcher({ onSwitch, currentTenantId }: Props) {
     listTenants().then(setTenants).catch(() => setTenants([]));
   }, []);
 
-  // close on outside click
   useEffect(() => {
     function handler(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
@@ -52,69 +53,77 @@ export function TenantSwitcher({ onSwitch, currentTenantId }: Props) {
   }
 
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
-      {/* Trigger button */}
+    <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm transition-colors"
         style={{
-          display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-          background: '#1e1e2e', border: '1px solid #2a2a3e', borderRadius: 8,
-          padding: '8px 12px', cursor: 'pointer', color: '#e2e8f0',
+          background: 'var(--bg-elevated)',
+          border: '1px solid var(--border-mid)',
+          color: 'var(--text-primary)',
         }}
       >
-        <span style={{ fontSize: 16 }}>🏢</span>
-        <span style={{ flex: 1, textAlign: 'left', fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <span className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0 text-xs font-bold"
+          style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}>
+          {(current?.name ?? 'T')[0].toUpperCase()}
+        </span>
+        <span className="flex-1 text-left truncate" style={{ color: current ? 'var(--text-primary)' : 'var(--text-muted)' }}>
           {current?.name ?? (currentTenantId ? currentTenantId.slice(0, 8) + '…' : 'Select tenant')}
         </span>
-        <span style={{ color: '#64748b', fontSize: 10 }}>{open ? '▲' : '▼'}</span>
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" style={{ color: 'var(--text-muted)', transform: open ? 'rotate(180deg)' : undefined, transition: 'transform 0.15s' }}>
+          <path d="M5 7L1 3h8L5 7z" />
+        </svg>
       </button>
 
-      {/* Dropdown */}
       {open && (
-        <div style={{
-          position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 100,
-          background: '#1e1e2e', border: '1px solid #2a2a3e', borderRadius: 8,
-          boxShadow: '0 8px 24px #0009', overflow: 'hidden',
-        }}>
+        <div className="absolute top-full mt-1.5 left-0 right-0 rounded-lg overflow-hidden z-50"
+          style={{ background: 'var(--bg-card)', border: '1px solid var(--border-mid)', boxShadow: '0 8px 32px #0009' }}>
           {tenants.length === 0 && !creating && (
-            <div style={{ padding: '12px 14px', color: '#64748b', fontSize: 12 }}>No tenants yet.</div>
+            <div className="px-3 py-3 text-xs" style={{ color: 'var(--text-muted)' }}>No tenants yet.</div>
           )}
 
           {tenants.map((t) => (
             <div
               key={t.id}
               onClick={() => select(t)}
+              className="flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-colors"
               style={{
-                padding: '9px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8,
-                background: t.id === currentTenantId ? '#2563eb22' : 'transparent',
-                borderLeft: t.id === currentTenantId ? '3px solid #2563eb' : '3px solid transparent',
+                background: t.id === currentTenantId ? 'var(--bg-hover)' : 'transparent',
+                borderLeft: `2px solid ${t.id === currentTenantId ? 'var(--accent)' : 'transparent'}`,
               }}
+              onMouseEnter={(e) => { if (t.id !== currentTenantId) e.currentTarget.style.background = 'var(--bg-elevated)'; }}
+              onMouseLeave={(e) => { if (t.id !== currentTenantId) e.currentTarget.style.background = 'transparent'; }}
             >
-              <span style={{ fontSize: 14 }}>🏢</span>
-              <div>
-                <div style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 500 }}>{t.name}</div>
-                <div style={{ color: '#64748b', fontSize: 11 }}>{t.slug}</div>
+              <span className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0 text-xs font-bold"
+                style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}>
+                {t.name[0].toUpperCase()}
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>{t.name}</div>
+                <div className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{t.slug}</div>
               </div>
               {t.id === currentTenantId && (
-                <span style={{ marginLeft: 'auto', color: '#2563eb', fontSize: 12 }}>✓</span>
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'var(--accent)', flexShrink: 0 }}>
+                  <polyline points="2 6 5 9 10 3" />
+                </svg>
               )}
             </div>
           ))}
 
-          <div style={{ borderTop: '1px solid #2a2a3e' }}>
+          <div style={{ borderTop: '1px solid var(--border-mid)' }}>
             {!creating ? (
               <button
                 onClick={() => setCreating(true)}
-                style={{
-                  width: '100%', padding: '9px 14px', background: 'none', border: 'none',
-                  color: '#3b82f6', fontSize: 13, cursor: 'pointer', textAlign: 'left',
-                }}
+                className="w-full px-3 py-2 text-xs text-left transition-colors"
+                style={{ color: 'var(--text-secondary)', background: 'transparent' }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-elevated)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
               >
                 + New tenant
               </button>
             ) : (
-              <form onSubmit={handleCreate} style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <input
+              <form onSubmit={handleCreate} className="p-3 flex flex-col gap-2">
+                <Input
                   placeholder="Name"
                   value={newName}
                   onChange={(e) => {
@@ -123,19 +132,21 @@ export function TenantSwitcher({ onSwitch, currentTenantId }: Props) {
                   }}
                   autoFocus
                   required
-                  style={inputStyle}
+                  className="h-7 text-xs"
+                  style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', color: 'var(--text-primary)' }}
                 />
-                <input
+                <Input
                   placeholder="Slug"
                   value={newSlug}
                   onChange={(e) => setNewSlug(e.target.value)}
                   required
-                  style={inputStyle}
+                  className="h-7 text-xs"
+                  style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', color: 'var(--text-primary)' }}
                 />
-                {error && <div style={{ color: '#fca5a5', fontSize: 11 }}>{error}</div>}
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button type="submit" style={{ ...btnStyle('#2563eb'), flex: 1 }}>Create</button>
-                  <button type="button" onClick={() => { setCreating(false); setError(''); }} style={{ ...btnStyle('#374151'), flex: 1 }}>Cancel</button>
+                {error && <div className="text-xs" style={{ color: '#fca5a5' }}>{error}</div>}
+                <div className="flex gap-2">
+                  <Button type="submit" size="xs" className="flex-1" style={{ background: 'var(--text-primary)', color: 'var(--bg-void)' }}>Create</Button>
+                  <Button type="button" size="xs" variant="outline" className="flex-1" onClick={() => { setCreating(false); setError(''); }}>Cancel</Button>
                 </div>
               </form>
             )}
@@ -144,14 +155,4 @@ export function TenantSwitcher({ onSwitch, currentTenantId }: Props) {
       )}
     </div>
   );
-}
-
-const inputStyle: React.CSSProperties = {
-  background: '#13131f', border: '1px solid #2a2a3e', borderRadius: 6,
-  padding: '6px 10px', color: '#e2e8f0', fontSize: 13, outline: 'none', width: '100%',
-  boxSizing: 'border-box',
-};
-
-function btnStyle(bg: string): React.CSSProperties {
-  return { background: bg, color: '#fff', border: 'none', borderRadius: 6, padding: '6px 10px', cursor: 'pointer', fontSize: 12, fontWeight: 500 };
 }

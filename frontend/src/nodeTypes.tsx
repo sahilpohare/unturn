@@ -1,38 +1,33 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 
 export const typeColors: Record<string, string> = {
-  'trigger/webhook': '#7c3aed',
-  'trigger/schedule': '#7c3aed',
-  'trigger/manual': '#7c3aed',
-  agent: '#2563eb',
-  http: '#0891b2',
-  transform: '#059669',
-  condition: '#d97706',
-  delay: '#6b7280',
-  'brand-research': '#db2777',
-  'meta-ads-search': '#ea580c',
-  'creator-vet': '#65a30d',
-  'instagram-dm': '#c2410c',
+  'trigger/webhook':  'var(--c-trigger)',
+  'trigger/schedule': 'var(--c-trigger)',
+  'trigger/manual':   'var(--c-trigger)',
+  agent:              'var(--c-agent)',
+  http:               'var(--c-http)',
+  transform:          'var(--c-transform)',
+  condition:          'var(--c-condition)',
+  delay:              'var(--c-delay)',
+  'brand-research':   'var(--c-brand)',
+  'meta-ads-search':  'var(--c-meta)',
+  'creator-vet':      'var(--c-creator)',
+  'instagram-dm':     'var(--c-dm)',
 };
 
 export const typeIcons: Record<string, string> = {
-  'trigger/webhook': '⚡',
-  'trigger/schedule': '🕐',
-  'trigger/manual': '▶',
-  agent: '🤖',
-  http: '🌐',
-  transform: '🔄',
-  condition: '🔀',
-  delay: '⏱',
-  'brand-research': '🔍',
-  'meta-ads-search': '📢',
-  'creator-vet': '✅',
-  'instagram-dm': '💬',
-};
-
-const toolTypeIcons: Record<string, string> = {
-  http: '🌐',
-  builtin: '🔧',
+  'trigger/webhook':  'WH',
+  'trigger/schedule': 'SC',
+  'trigger/manual':   'MN',
+  agent:              'AI',
+  http:               'HT',
+  transform:          'TX',
+  condition:          'IF',
+  delay:              'DL',
+  'brand-research':   'BR',
+  'meta-ads-search':  'MA',
+  'creator-vet':      'CV',
+  'instagram-dm':     'DM',
 };
 
 export interface ToolInfo {
@@ -54,34 +49,43 @@ export interface StepNodeData {
 export function StepNode({ data, selected }: NodeProps) {
   const d = data as unknown as StepNodeData;
   const color = typeColors[d.type] ?? '#374151';
-  const icon = typeIcons[d.type] ?? '•';
+  const badge = typeIcons[d.type] ?? '?';
   const isTrigger = d.isTrigger ?? d.type?.startsWith('trigger/');
 
   return (
     <div style={{
-      background: '#1e1e2e',
-      border: `2px solid ${selected ? '#fff' : color}`,
+      background: 'var(--bg-card)',
+      border: `1.5px solid ${selected ? color : 'var(--border-mid)'}`,
       borderRadius: 10,
-      minWidth: 160,
-      boxShadow: selected ? `0 0 0 3px ${color}55` : '0 2px 8px #0008',
-      fontFamily: 'sans-serif',
+      minWidth: 168,
+      boxShadow: selected ? `0 0 0 3px ${color}30, 0 4px 16px #0009` : '0 2px 8px #0006',
       overflow: 'hidden',
+      fontFamily: 'var(--font-ui)',
     }}>
-      <div style={{ background: color, padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ fontSize: 14 }}>{icon}</span>
-        <span style={{ color: '#fff', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>
-          {d.type}
-        </span>
-      </div>
-      <div style={{ padding: '8px 12px' }}>
-        <div style={{ color: '#e2e8f0', fontWeight: 600, fontSize: 13 }}>{d.label}</div>
-        <div style={{ color: '#64748b', fontSize: 11, marginTop: 2 }}>ref: {d.ref}</div>
+      {/* Top accent line */}
+      <div style={{ height: 2, background: color }} />
+
+      <div style={{ padding: '8px 12px 10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 5 }}>
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            width: 22, height: 22, borderRadius: 5, fontSize: 9, fontWeight: 700,
+            letterSpacing: 0.5, background: color + '22', color,
+          }}>
+            {badge}
+          </span>
+          <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--text-muted)' }}>
+            {d.type}
+          </span>
+        </div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.3 }}>{d.label}</div>
+        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2, fontFamily: 'var(--font-mono)' }}>#{d.ref}</div>
       </div>
 
-      {!isTrigger && <Handle type="target" position={Position.Top} style={{ background: color }} />}
-      <Handle type="source" position={Position.Bottom} style={{ background: color }} id="success" />
+      {!isTrigger && <Handle type="target" position={Position.Top} style={{ background: color, border: '2px solid var(--bg-card)', width: 8, height: 8 }} />}
+      <Handle type="source" position={Position.Bottom} style={{ background: color, border: '2px solid var(--bg-card)', width: 8, height: 8 }} id="success" />
       {d.type === 'condition' && (
-        <Handle type="source" position={Position.Right} style={{ background: '#ef4444', top: '50%' }} id="failure" />
+        <Handle type="source" position={Position.Right} style={{ background: 'var(--danger)', border: '2px solid var(--bg-card)', top: '50%', width: 8, height: 8 }} id="failure" />
       )}
     </div>
   );
@@ -91,55 +95,62 @@ export function StepNode({ data, selected }: NodeProps) {
 
 export function AgentNode({ data, selected }: NodeProps) {
   const d = data as unknown as StepNodeData;
-  const color = '#2563eb';
+  const color = 'var(--c-agent)';
   const tools = d.tools ?? [];
 
   return (
     <div style={{
-      background: '#1e1e2e',
-      border: `2px solid ${selected ? '#fff' : color}`,
+      background: 'var(--bg-card)',
+      border: `1.5px solid ${selected ? color : 'var(--border-mid)'}`,
       borderRadius: 10,
       minWidth: 220,
-      boxShadow: selected ? `0 0 0 3px ${color}55` : '0 2px 8px #0008',
-      fontFamily: 'sans-serif',
+      boxShadow: selected ? `0 0 0 3px #38bdf830, 0 4px 16px #0009` : '0 2px 8px #0006',
       overflow: 'visible',
       position: 'relative',
+      fontFamily: 'var(--font-ui)',
     }}>
-      {/* Header */}
-      <div style={{ background: color, padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 6, borderRadius: '8px 8px 0 0' }}>
-        <span style={{ fontSize: 14 }}>🤖</span>
-        <span style={{ color: '#fff', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>AI Agent</span>
-      </div>
+      {/* Top accent line */}
+      <div style={{ height: 2, background: color, borderRadius: '10px 10px 0 0' }} />
 
-      {/* Name */}
-      <div style={{ padding: '8px 12px 4px' }}>
-        <div style={{ color: '#e2e8f0', fontWeight: 600, fontSize: 13 }}>{d.label}</div>
-        <div style={{ color: '#64748b', fontSize: 11, marginTop: 2 }}>ref: {d.ref}</div>
+      {/* Header */}
+      <div style={{ padding: '8px 12px 6px', display: 'flex', alignItems: 'center', gap: 7 }}>
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          width: 22, height: 22, borderRadius: 5, fontSize: 9, fontWeight: 700,
+          letterSpacing: 0.5, background: '#38bdf822', color,
+        }}>
+          AI
+        </span>
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>{d.label}</div>
+          <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>#{d.ref}</div>
+        </div>
       </div>
 
       {/* Tools section */}
       {tools.length > 0 && (
-        <div style={{ borderTop: '1px solid #2a2a3e', margin: '4px 0 0' }}>
-          <div style={{ padding: '4px 12px', color: '#475569', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+        <div style={{ borderTop: '1px solid var(--border-mid)', marginTop: 2 }}>
+          <div style={{ padding: '3px 12px', fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--text-muted)' }}>
             Tools
           </div>
-          {tools.map((tool, i) => (
-            <div key={tool.name} style={{ position: 'relative', padding: '5px 36px 5px 12px', borderTop: '1px solid #1a1a2e', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 13 }}>{toolTypeIcons[tool.type] ?? '🔧'}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: '#cbd5e1', fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tool.name}</div>
-                <div style={{ color: '#475569', fontSize: 10 }}>{tool.type}</div>
+          {tools.map((tool) => (
+            <div key={tool.name} style={{ position: 'relative', padding: '4px 36px 4px 12px', borderTop: '1px solid var(--bg-elevated)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ width: 16, height: 16, borderRadius: 4, background: tool.type === 'builtin' ? '#38bdf820' : '#34d39920', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: tool.type === 'builtin' ? color : 'var(--c-http)', fontWeight: 700, flexShrink: 0 }}>
+                {tool.type === 'builtin' ? 'B' : 'H'}
               </div>
-              {/* Per-tool source handle on the right */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tool.name}</div>
+                <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>{tool.type}</div>
+              </div>
               <Handle
                 type="source"
                 position={Position.Right}
                 id={`tool-${tool.name}`}
                 style={{
-                  background: '#0891b2',
-                  border: '2px solid #1e1e2e',
-                  width: 10, height: 10,
-                  right: -5,
+                  background: 'var(--c-http)',
+                  border: '2px solid var(--bg-card)',
+                  width: 8, height: 8,
+                  right: -4,
                   top: '50%',
                   transform: 'translateY(-50%)',
                 }}
@@ -150,15 +161,14 @@ export function AgentNode({ data, selected }: NodeProps) {
       )}
 
       {tools.length === 0 && (
-        <div style={{ padding: '6px 12px 10px', color: '#334155', fontSize: 11, fontStyle: 'italic' }}>
+        <div style={{ padding: '4px 12px 10px', fontSize: 10, color: 'var(--text-muted)', fontStyle: 'italic' }}>
           No tools — double-click to add
         </div>
       )}
 
-      {/* Flow handles */}
-      <Handle type="target" position={Position.Top} style={{ background: color }} />
-      <Handle type="source" position={Position.Bottom} style={{ background: color }} id="success" />
-      <Handle type="source" position={Position.Left} style={{ background: '#ef4444' }} id="failure" />
+      <Handle type="target" position={Position.Top} style={{ background: color, border: '2px solid var(--bg-card)', width: 8, height: 8 }} />
+      <Handle type="source" position={Position.Bottom} style={{ background: color, border: '2px solid var(--bg-card)', width: 8, height: 8 }} id="success" />
+      <Handle type="source" position={Position.Left} style={{ background: 'var(--danger)', border: '2px solid var(--bg-card)', width: 8, height: 8 }} id="failure" />
     </div>
   );
 }

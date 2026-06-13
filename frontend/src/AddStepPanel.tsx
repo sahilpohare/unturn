@@ -2,20 +2,23 @@ import { useState, useRef } from 'react';
 import type { Flow, Step, StepType } from './types';
 import * as api from './api';
 import { ToolEditor, type ToolDef } from './ToolEditor';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 
-export const STEP_CATALOGUE: { type: StepType; label: string; icon: string; color: string; defaultConfig: Record<string, unknown> }[] = [
-  { type: 'trigger/manual',   label: 'Manual Trigger',   icon: '▶',  color: '#7c3aed', defaultConfig: {} },
-  { type: 'trigger/webhook',  label: 'Webhook Trigger',  icon: '⚡', color: '#7c3aed', defaultConfig: { secret: '' } },
-  { type: 'trigger/schedule', label: 'Schedule Trigger', icon: '🕐', color: '#7c3aed', defaultConfig: { cron: '0 9 * * 1' } },
-  { type: 'agent',            label: 'AI Agent',         icon: '🤖', color: '#2563eb', defaultConfig: { agentName: '', promptTemplate: '', tools: [] } },
-  { type: 'http',             label: 'HTTP Request',     icon: '🌐', color: '#0891b2', defaultConfig: { url: '', method: 'GET' } },
-  { type: 'transform',        label: 'Transform',        icon: '🔄', color: '#059669', defaultConfig: { mapping: {} } },
-  { type: 'condition',        label: 'Condition',        icon: '🔀', color: '#d97706', defaultConfig: { expression: '', onTrue: '', onFalse: '' } },
-  { type: 'delay',            label: 'Delay',            icon: '⏱', color: '#6b7280', defaultConfig: { duration: '30s' } },
-  { type: 'brand-research',   label: 'Brand Research',   icon: '🔍', color: '#db2777', defaultConfig: { websiteUrl: '' } },
-  { type: 'meta-ads-search',  label: 'Meta Ads Search',  icon: '📢', color: '#ea580c', defaultConfig: { pageIdPath: '', countries: ['US'] } },
-  { type: 'creator-vet',      label: 'Creator Vet',      icon: '✅', color: '#65a30d', defaultConfig: { handlesPath: '' } },
-  { type: 'instagram-dm',     label: 'Instagram DM',     icon: '💬', color: '#c2410c', defaultConfig: { recipientIdPath: '', messagePath: '' } },
+export const STEP_CATALOGUE: { type: StepType; label: string; badge: string; color: string; defaultConfig: Record<string, unknown> }[] = [
+  { type: 'trigger/manual',   label: 'Manual Trigger',   badge: 'MN', color: 'var(--c-trigger)',  defaultConfig: {} },
+  { type: 'trigger/webhook',  label: 'Webhook Trigger',  badge: 'WH', color: 'var(--c-trigger)',  defaultConfig: { secret: '' } },
+  { type: 'trigger/schedule', label: 'Schedule Trigger', badge: 'SC', color: 'var(--c-trigger)',  defaultConfig: { cron: '0 9 * * 1' } },
+  { type: 'agent',            label: 'AI Agent',         badge: 'AI', color: 'var(--c-agent)',    defaultConfig: { agentName: '', promptTemplate: '', tools: [] } },
+  { type: 'http',             label: 'HTTP Request',     badge: 'HT', color: 'var(--c-http)',     defaultConfig: { url: '', method: 'GET' } },
+  { type: 'transform',        label: 'Transform',        badge: 'TX', color: 'var(--c-transform)',defaultConfig: { mapping: {} } },
+  { type: 'condition',        label: 'Condition',        badge: 'IF', color: 'var(--c-condition)',defaultConfig: { expression: '', onTrue: '', onFalse: '' } },
+  { type: 'delay',            label: 'Delay',            badge: 'DL', color: 'var(--c-delay)',    defaultConfig: { duration: '30s' } },
+  { type: 'brand-research',   label: 'Brand Research',   badge: 'BR', color: 'var(--c-brand)',    defaultConfig: { websiteUrl: '' } },
+  { type: 'meta-ads-search',  label: 'Meta Ads Search',  badge: 'MA', color: 'var(--c-meta)',     defaultConfig: { pageIdPath: '', countries: ['US'] } },
+  { type: 'creator-vet',      label: 'Creator Vet',      badge: 'CV', color: 'var(--c-creator)',  defaultConfig: { handlesPath: '' } },
+  { type: 'instagram-dm',     label: 'Instagram DM',     badge: 'DM', color: 'var(--c-dm)',       defaultConfig: { recipientIdPath: '', messagePath: '' } },
 ];
 
 interface Props {
@@ -37,9 +40,11 @@ export function AddStepPanel({ flow, onClose, onSaved, editStep }: Props) {
   const [ref, setRef] = useState(editStep?.ref ?? '');
   const [onSuccess, setOnSuccess] = useState(editStep?.onSuccess ?? '');
   const [onFailure, setOnFailure] = useState(editStep?.onFailure ?? '');
+  const [retryAttempts, setRetryAttempts] = useState(String(editStep?.retryPolicy?.maximumAttempts ?? 3));
+  const [retryInterval, setRetryInterval] = useState(editStep?.retryPolicy?.initialInterval ?? '1s');
 
-  // Agent-specific fields
   const [agentName, setAgentName] = useState(initConfig?.agentName ?? '');
+  const [systemPrompt, setSystemPrompt] = useState(initConfig?.systemPrompt ?? '');
   const [promptTemplate, setPromptTemplate] = useState(initConfig?.promptTemplate ?? '');
   const [threadIdPath, setThreadIdPath] = useState(initConfig?.threadIdPath ?? '');
   const [resourceIdPath, setResourceIdPath] = useState(initConfig?.resourceIdPath ?? '');
@@ -47,18 +52,16 @@ export function AddStepPanel({ flow, onClose, onSaved, editStep }: Props) {
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const [varPickerOpen, setVarPickerOpen] = useState(false);
 
-  // Generic config (non-agent)
   const [configText, setConfigText] = useState(() => {
     if (!editStep) return '';
     const c = { ...(editStep.config as any) };
-    if (editStep.type === 'agent') return ''; // agent uses structured fields
+    if (editStep.type === 'agent') return '';
     return JSON.stringify(c, null, 2);
   });
   const [configError, setConfigError] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  // Available injection variables from prior steps
   const priorSteps = (flow.steps ?? []).filter((s) => s.ref !== editStep?.ref);
   const injectionVars: { label: string; value: string }[] = [
     { label: '$.input (flow input)', value: '$.input' },
@@ -93,7 +96,7 @@ export function AddStepPanel({ flow, onClose, onSaved, editStep }: Props) {
     setThreadIdPath('');
     setResourceIdPath('');
     const cfg = { ...item.defaultConfig } as any;
-    if (item.type === 'agent') { delete cfg.tools; setConfigText(''); }
+    if (item.type === 'agent') { delete cfg.tools; setSystemPrompt(''); setConfigText(''); }
     else setConfigText(JSON.stringify(cfg, null, 2));
     setConfigError('');
     setError('');
@@ -107,7 +110,7 @@ export function AddStepPanel({ flow, onClose, onSaved, editStep }: Props) {
 
   function buildConfig() {
     if (selected?.type === 'agent') {
-      return { agentName, promptTemplate, tools, threadIdPath: threadIdPath || undefined, resourceIdPath: resourceIdPath || undefined };
+      return { agentName, systemPrompt: systemPrompt || undefined, promptTemplate, tools, threadIdPath: threadIdPath || undefined, resourceIdPath: resourceIdPath || undefined };
     }
     return JSON.parse(configText);
   }
@@ -121,11 +124,12 @@ export function AddStepPanel({ flow, onClose, onSaved, editStep }: Props) {
       const existing = flow.steps ?? [];
       const isTrigger = selected.type.startsWith('trigger/');
       const config = buildConfig();
+      const retryPolicy = { maximumAttempts: Math.max(1, parseInt(retryAttempts, 10) || 3), initialInterval: retryInterval || '1s' };
       let allSteps;
       if (isEdit) {
         allSteps = existing.map((s) =>
           s.id === editStep.id
-            ? { ...s, name: name.trim(), config, onSuccess: onSuccess || null, onFailure: onFailure || null }
+            ? { ...s, name: name.trim(), config, onSuccess: onSuccess || null, onFailure: onFailure || null, retryPolicy }
             : s,
         );
       } else {
@@ -134,7 +138,7 @@ export function AddStepPanel({ flow, onClose, onSaved, editStep }: Props) {
           ref: ref.trim(), type: selected.type, name: name.trim(),
           position: isTrigger ? 0 : base.length, config,
           onSuccess: onSuccess || null, onFailure: onFailure || null,
-          retryPolicy: { maximumAttempts: 3, initialInterval: '1s' },
+          retryPolicy,
         };
         allSteps = isTrigger
           ? [newStep, ...base.map((s, i) => ({ ...s, position: i + 1 }))]
@@ -165,86 +169,141 @@ export function AddStepPanel({ flow, onClose, onSaved, editStep }: Props) {
 
   const existingRefs = (flow.steps ?? []).filter((s) => !editStep || s.id !== editStep.id).map((s) => s.ref);
   const isAgentSelected = selected?.type === 'agent';
-  const modalWidth = isAgentSelected || isAgent ? 680 : 560;
+  const modalWidth = isAgentSelected || isAgent ? 700 : 580;
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, background: '#0009', zIndex: 200,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }} onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: 'rgba(0,0,0,0.75)' }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
       <div style={{
-        background: '#13131f', border: '1px solid #2a2a3e', borderRadius: 12,
-        width: modalWidth, maxHeight: '90vh', display: 'flex', flexDirection: 'column',
-        boxShadow: '0 24px 64px #000a', fontFamily: 'sans-serif', overflow: 'hidden',
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border-mid)',
+        borderRadius: 14,
+        width: modalWidth,
+        maxHeight: '90vh',
+        display: 'flex',
+        flexDirection: 'column',
+        boxShadow: '0 32px 80px #000d',
+        overflow: 'hidden',
         transition: 'width 0.15s',
       }}>
         {/* Header */}
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #2a2a3e', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-          <span style={{ color: '#e2e8f0', fontWeight: 700, fontSize: 15 }}>{isEdit ? 'Edit Step' : 'Add Step'}</span>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div className="flex items-center justify-between px-5 py-3.5" style={{ borderBottom: '1px solid var(--border-mid)', flexShrink: 0 }}>
+          <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+            {isEdit ? 'Edit Step' : 'Add Step'}
+          </span>
+          <div className="flex items-center gap-2">
             {isEdit && (
-              <button onClick={handleDelete} disabled={saving} style={{ background: 'none', border: '1px solid #dc2626', color: '#ef4444', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 12 }}>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={saving}
+                className="h-7 text-xs"
+              >
                 Delete
-              </button>
+              </Button>
             )}
-            <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>×</button>
+            <button
+              onClick={onClose}
+              className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
+              style={{ color: 'var(--text-muted)' }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)'; }}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M1 1l12 12M13 1L1 13" />
+              </svg>
+            </button>
           </div>
         </div>
 
-        <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        <div className="flex flex-1 overflow-hidden">
           {/* Left: type palette */}
-          <div style={{ width: 190, borderRight: '1px solid #2a2a3e', overflowY: 'auto', padding: 8, flexShrink: 0 }}>
+          <div className="overflow-y-auto p-2" style={{ width: 192, borderRight: '1px solid var(--border-mid)', flexShrink: 0 }}>
             {STEP_CATALOGUE.map((item) => (
-              <div key={item.type} onClick={() => pickType(item)} style={{
-                padding: '7px 10px', borderRadius: 8, marginBottom: 2,
-                display: 'flex', alignItems: 'center', gap: 8,
-                cursor: isEdit ? 'default' : 'pointer',
-                opacity: isEdit && item.type !== selected?.type ? 0.25 : 1,
-                background: selected?.type === item.type ? item.color + '22' : 'transparent',
-                border: `1px solid ${selected?.type === item.type ? item.color : 'transparent'}`,
-              }}>
-                <span style={{ fontSize: 15, width: 20, textAlign: 'center' }}>{item.icon}</span>
+              <div
+                key={item.type}
+                onClick={() => pickType(item)}
+                className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg mb-0.5 transition-all"
+                style={{
+                  cursor: isEdit ? 'default' : 'pointer',
+                  opacity: isEdit && item.type !== selected?.type ? 0.2 : 1,
+                  background: selected?.type === item.type ? item.color + '18' : 'transparent',
+                  border: `1px solid ${selected?.type === item.type ? item.color + '60' : 'transparent'}`,
+                }}
+                onMouseEnter={(e) => { if (!isEdit && selected?.type !== item.type) e.currentTarget.style.background = 'var(--bg-elevated)'; }}
+                onMouseLeave={(e) => { if (!isEdit && selected?.type !== item.type) e.currentTarget.style.background = 'transparent'; }}
+              >
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  width: 22, height: 22, borderRadius: 5, fontSize: 8, fontWeight: 700,
+                  letterSpacing: 0.5, flexShrink: 0,
+                  background: item.color + '22', color: item.color,
+                }}>
+                  {item.badge}
+                </span>
                 <div>
-                  <div style={{ color: '#e2e8f0', fontSize: 12, fontWeight: 500 }}>{item.label}</div>
-                  <div style={{ color: '#475569', fontSize: 10 }}>{item.type}</div>
+                  <div className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>{item.label}</div>
+                  <div className="text-[9px]" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{item.type}</div>
                 </div>
               </div>
             ))}
           </div>
 
           {/* Right: form */}
-          <div style={{ flex: 1, padding: 20, overflowY: 'auto' }}>
+          <div className="flex-1 overflow-y-auto p-5">
             {!selected ? (
-              <div style={{ color: '#475569', fontSize: 13, textAlign: 'center', paddingTop: 40 }}>← Pick a step type</div>
+              <div className="text-sm text-center pt-12" style={{ color: 'var(--text-muted)' }}>
+                Pick a step type from the list
+              </div>
             ) : (
               <>
                 {/* Type badge */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
-                  <div style={{ background: selected.color, borderRadius: 8, width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17 }}>{selected.icon}</div>
+                <div className="flex items-center gap-3 mb-5">
+                  <span style={{
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    width: 36, height: 36, borderRadius: 8, fontSize: 11, fontWeight: 700, letterSpacing: 0.5,
+                    background: selected.color + '22', color: selected.color,
+                  }}>
+                    {selected.badge}
+                  </span>
                   <div>
-                    <div style={{ color: '#e2e8f0', fontWeight: 600, fontSize: 14 }}>{selected.label}</div>
-                    <div style={{ color: '#64748b', fontSize: 11 }}>{selected.type}</div>
+                    <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{selected.label}</div>
+                    <div className="text-xs" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{selected.type}</div>
                   </div>
                 </div>
 
-                <Label>Name</Label>
-                <input value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} placeholder="Step name" />
+                <FieldLabel>Name</FieldLabel>
+                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Step name" className="mb-3 h-8 text-xs" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', color: 'var(--text-primary)' }} />
 
-                <Label>Ref <span style={{ color: '#475569', fontWeight: 400 }}>(unique within flow)</span></Label>
-                <input value={ref} onChange={(e) => setRef(e.target.value)} style={inputStyle} disabled={isEdit} />
+                <FieldLabel>Ref <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(unique)</span></FieldLabel>
+                <Input value={ref} onChange={(e) => setRef(e.target.value)} disabled={isEdit} className="mb-3 h-8 text-xs font-mono" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', color: 'var(--text-primary)', opacity: isEdit ? 0.6 : 1 }} />
 
                 {existingRefs.length > 0 && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div className="grid grid-cols-2 gap-3 mb-0">
                     <div>
-                      <Label>On Success</Label>
-                      <select value={onSuccess ?? ''} onChange={(e) => setOnSuccess(e.target.value)} style={{ ...inputStyle, cursor: 'pointer' }}>
+                      <FieldLabel>On Success</FieldLabel>
+                      <select
+                        value={onSuccess ?? ''}
+                        onChange={(e) => setOnSuccess(e.target.value)}
+                        className="w-full h-8 text-xs rounded-lg px-2.5"
+                        style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', color: 'var(--text-primary)', cursor: 'pointer' }}
+                      >
                         <option value="">— end of flow —</option>
                         {existingRefs.map((r) => <option key={r} value={r}>{r}</option>)}
                       </select>
                     </div>
                     <div>
-                      <Label>On Failure</Label>
-                      <select value={onFailure ?? ''} onChange={(e) => setOnFailure(e.target.value)} style={{ ...inputStyle, cursor: 'pointer' }}>
+                      <FieldLabel>On Failure</FieldLabel>
+                      <select
+                        value={onFailure ?? ''}
+                        onChange={(e) => setOnFailure(e.target.value)}
+                        className="w-full h-8 text-xs rounded-lg px-2.5"
+                        style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', color: 'var(--text-primary)', cursor: 'pointer' }}
+                      >
                         <option value="">— fail flow —</option>
                         {existingRefs.map((r) => <option key={r} value={r}>{r}</option>)}
                       </select>
@@ -252,113 +311,133 @@ export function AddStepPanel({ flow, onClose, onSaved, editStep }: Props) {
                   </div>
                 )}
 
-                {/* ── Agent-specific fields ── */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <FieldLabel>Max Retries</FieldLabel>
+                    <Input type="number" min={1} max={10} value={retryAttempts} onChange={(e) => setRetryAttempts(e.target.value)} className="h-8 text-xs" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', color: 'var(--text-primary)' }} />
+                  </div>
+                  <div>
+                    <FieldLabel>Retry Interval</FieldLabel>
+                    <Input value={retryInterval} onChange={(e) => setRetryInterval(e.target.value)} placeholder="1s / 30s / 2m" className="h-8 text-xs" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', color: 'var(--text-primary)' }} />
+                  </div>
+                </div>
+
+                {/* Agent-specific fields */}
                 {isAgentSelected && (
-                  <>
-                    <div style={{ borderTop: '1px solid #2a2a3e', margin: '16px 0 0', paddingTop: 16 }}>
-                      <div style={{ color: '#2563eb', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>
-                        🤖 Agent Configuration
-                      </div>
-
-                      <Label>Agent Name <span style={{ color: '#475569', fontWeight: 400 }}>(Mastra agent ID)</span></Label>
-                      <input value={agentName} onChange={(e) => setAgentName(e.target.value)} style={inputStyle} placeholder="e.g. outreach-agent" />
-
-                      <Label>
-                        Prompt Template
-                        <button
-                          onClick={() => setVarPickerOpen((o) => !o)}
-                          style={{ marginLeft: 8, background: '#1e1e2e', border: '1px solid #2a2a3e', color: '#3b82f6', borderRadius: 4, padding: '1px 7px', fontSize: 10, cursor: 'pointer', fontWeight: 700 }}
-                        >
-                          + inject var
-                        </button>
-                      </Label>
-
-                      {varPickerOpen && (
-                        <div style={{ background: '#1e1e2e', border: '1px solid #2a2a3e', borderRadius: 8, marginBottom: 8, overflow: 'hidden' }}>
-                          <div style={{ padding: '6px 10px', color: '#64748b', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', borderBottom: '1px solid #2a2a3e' }}>
-                            Click to insert at cursor
-                          </div>
-                          {injectionVars.map((v) => (
-                            <div
-                              key={v.value}
-                              onClick={() => insertVar(v.value)}
-                              style={{ padding: '7px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid #1a1a2e' }}
-                              onMouseEnter={(e) => (e.currentTarget.style.background = '#2a2a3e')}
-                              onMouseLeave={(e) => (e.currentTarget.style.background = '')}
-                            >
-                              <code style={{ color: '#60a5fa', fontSize: 11, background: '#0f172a', padding: '1px 5px', borderRadius: 3 }}>{`{{${v.value}}}`}</code>
-                              <span style={{ color: '#64748b', fontSize: 11 }}>{v.label}</span>
-                            </div>
-                          ))}
-                          {injectionVars.length === 0 && (
-                            <div style={{ padding: '8px 12px', color: '#475569', fontSize: 12 }}>No prior steps yet</div>
-                          )}
-                        </div>
-                      )}
-
-                      <textarea
-                        ref={promptRef}
-                        value={promptTemplate}
-                        onChange={(e) => setPromptTemplate(e.target.value)}
-                        rows={6}
-                        placeholder={'You are a helpful assistant.\n\nResearch this brand: {{$.input.brandName}}\n\nPrevious results: {{$.steps.research-step.text}}'}
-                        style={{ ...inputStyle, resize: 'vertical', fontFamily: 'monospace', fontSize: 12, lineHeight: 1.5 }}
-                      />
-                      <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>
-                        Use <code style={{ color: '#60a5fa' }}>{'{{$.input.field}}'}</code>, <code style={{ color: '#60a5fa' }}>{'{{$.steps.ref.field}}'}</code>, or <code style={{ color: '#60a5fa' }}>{'{{$.tenantId}}'}</code>
-                      </div>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 4 }}>
-                        <div>
-                          <Label>Thread ID path <span style={{ color: '#475569', fontWeight: 400 }}>(optional)</span></Label>
-                          <input value={threadIdPath} onChange={(e) => setThreadIdPath(e.target.value)} style={inputStyle} placeholder="$.input.threadId" />
-                        </div>
-                        <div>
-                          <Label>Resource ID path <span style={{ color: '#475569', fontWeight: 400 }}>(optional)</span></Label>
-                          <input value={resourceIdPath} onChange={(e) => setResourceIdPath(e.target.value)} style={inputStyle} placeholder="$.input.userId" />
-                        </div>
-                      </div>
-
-                      <Label>Tools</Label>
-                      <ToolEditor tools={tools} onChange={setTools} />
+                  <div className="mt-5 pt-5" style={{ borderTop: '1px solid var(--border-mid)' }}>
+                    <div className="text-[10px] font-semibold uppercase tracking-widest mb-4" style={{ color: 'var(--c-agent)' }}>
+                      Agent Configuration
                     </div>
-                  </>
+
+                    <FieldLabel>Agent Name <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(label / persona)</span></FieldLabel>
+                    <Input value={agentName} onChange={(e) => setAgentName(e.target.value)} placeholder="e.g. ugcResearchAgent" className="mb-3 h-8 text-xs" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', color: 'var(--text-primary)' }} />
+
+                    <FieldLabel>System Prompt <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></FieldLabel>
+                    <Textarea
+                      value={systemPrompt}
+                      onChange={(e) => setSystemPrompt(e.target.value)}
+                      rows={3}
+                      placeholder="You are a UGC sourcing specialist. Return structured JSON."
+                      className="mb-3 text-xs resize-y"
+                      style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}
+                    />
+
+                    <div className="flex items-center justify-between mb-1.5">
+                      <FieldLabel className="mb-0">Prompt Template</FieldLabel>
+                      <button
+                        onClick={() => setVarPickerOpen((o) => !o)}
+                        className="text-[10px] px-2 py-0.5 rounded font-semibold transition-colors"
+                        style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', color: 'var(--c-agent)' }}
+                      >
+                        + inject var
+                      </button>
+                    </div>
+
+                    {varPickerOpen && (
+                      <div className="rounded-lg mb-2 overflow-hidden" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)' }}>
+                        <div className="px-3 py-1.5 text-[9px] font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-mid)' }}>
+                          Click to insert at cursor
+                        </div>
+                        {injectionVars.map((v) => (
+                          <div
+                            key={v.value}
+                            onClick={() => insertVar(v.value)}
+                            className="flex items-center gap-2 px-3 py-1.5 cursor-pointer transition-colors"
+                            style={{ borderBottom: '1px solid var(--bg-base)' }}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                          >
+                            <code className="text-[10px] px-1.5 py-0.5 rounded" style={{ color: 'var(--c-agent)', background: '#38bdf810', fontFamily: 'var(--font-mono)' }}>{`{{${v.value}}}`}</code>
+                            <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{v.label}</span>
+                          </div>
+                        ))}
+                        {injectionVars.length === 0 && (
+                          <div className="px-3 py-2 text-xs" style={{ color: 'var(--text-muted)' }}>No prior steps yet</div>
+                        )}
+                      </div>
+                    )}
+
+                    <Textarea
+                      ref={promptRef}
+                      value={promptTemplate}
+                      onChange={(e) => setPromptTemplate(e.target.value)}
+                      rows={6}
+                      placeholder={'You are a helpful assistant.\n\nResearch this brand: {{$.input.brandName}}\n\nPrevious results: {{$.steps.research-step.text}}'}
+                      className="mb-1 text-xs resize-y"
+                      style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', lineHeight: 1.6 }}
+                    />
+                    <div className="text-[10px] mb-3" style={{ color: 'var(--text-muted)' }}>
+                      Use <code style={{ color: 'var(--c-agent)', fontFamily: 'var(--font-mono)' }}>{'{{$.input.field}}'}</code> or <code style={{ color: 'var(--c-agent)', fontFamily: 'var(--font-mono)' }}>{'{{$.steps.ref.field}}'}</code>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                      <div>
+                        <FieldLabel>Thread ID path <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></FieldLabel>
+                        <Input value={threadIdPath} onChange={(e) => setThreadIdPath(e.target.value)} placeholder="$.input.threadId" className="h-8 text-xs" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', color: 'var(--text-primary)' }} />
+                      </div>
+                      <div>
+                        <FieldLabel>Resource ID path <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></FieldLabel>
+                        <Input value={resourceIdPath} onChange={(e) => setResourceIdPath(e.target.value)} placeholder="$.input.userId" className="h-8 text-xs" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', color: 'var(--text-primary)' }} />
+                      </div>
+                    </div>
+
+                    <FieldLabel>Tools</FieldLabel>
+                    <ToolEditor tools={tools} onChange={setTools} />
+                  </div>
                 )}
 
-                {/* ── Generic JSON config (non-agent) ── */}
+                {/* Generic JSON config */}
                 {!isAgentSelected && (
                   <>
-                    <Label>
+                    <FieldLabel>
                       Config (JSON)
-                      {configError && <span style={{ color: '#ef4444', fontWeight: 400, marginLeft: 8 }}>{configError}</span>}
-                    </Label>
-                    <textarea
+                      {configError && <span className="ml-2 font-normal" style={{ color: 'var(--danger)' }}>{configError}</span>}
+                    </FieldLabel>
+                    <Textarea
                       value={configText}
                       onChange={(e) => { setConfigText(e.target.value); setConfigError(''); }}
                       onBlur={validateConfig}
                       rows={8}
-                      style={{ ...inputStyle, resize: 'vertical', fontFamily: 'monospace', fontSize: 12 }}
+                      className="text-xs resize-y"
+                      style={{ background: 'var(--bg-elevated)', border: `1px solid ${configError ? 'var(--danger)' : 'var(--border-mid)'}`, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}
                     />
                   </>
                 )}
 
                 {error && (
-                  <div style={{ background: '#dc262622', border: '1px solid #dc2626', borderRadius: 6, padding: '8px 12px', color: '#fca5a5', fontSize: 12, marginTop: 8 }}>
+                  <div className="mt-3 rounded-lg px-3 py-2 text-xs" style={{ background: '#ef444412', border: '1px solid #ef444440', color: '#fca5a5' }}>
                     {error}
                   </div>
                 )}
 
-                <button
+                <Button
                   onClick={handleSave}
                   disabled={saving || !name.trim() || !ref.trim()}
-                  style={{
-                    marginTop: 16, width: '100%', padding: '10px 0', background: selected.color,
-                    color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600,
-                    cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1,
-                  }}
+                  className="w-full mt-4 h-9 text-sm font-semibold"
+                  style={{ background: selected.color, color: '#fff', opacity: saving ? 0.7 : 1 }}
                 >
                   {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Step'}
-                </button>
+                </Button>
               </>
             )}
           </div>
@@ -368,15 +447,10 @@ export function AddStepPanel({ flow, onClose, onSaved, editStep }: Props) {
   );
 }
 
-function Label({ children }: { children: React.ReactNode }) {
+function FieldLabel({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div style={{ color: '#94a3b8', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 5, marginTop: 14 }}>
+    <div className={`text-[10px] font-semibold uppercase tracking-wide mb-1.5 mt-3 ${className ?? ''}`} style={{ color: 'var(--text-secondary)' }}>
       {children}
     </div>
   );
 }
-
-const inputStyle: React.CSSProperties = {
-  width: '100%', background: '#1e1e2e', border: '1px solid #2a2a3e', borderRadius: 8,
-  padding: '8px 12px', color: '#e2e8f0', fontSize: 13, outline: 'none', boxSizing: 'border-box',
-};

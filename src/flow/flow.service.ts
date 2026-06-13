@@ -3,18 +3,36 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { v4 as uuid } from 'uuid';
+import { createHmac, timingSafeEqual } from 'crypto';
 import { WorkflowNotFoundError } from '@temporalio/client';
 import { TenantContextService } from '../platform/rls/tenant-context.service';
 import { TemporalService } from '../temporal/temporal.service';
 import { FlowEntity, FlowStatus } from './flow.entity';
 import { StepEntity, StepType, StepConfig } from './step.entity';
+import { TenantEntity } from '../platform/tenant/tenant.entity';
 import { FlowSnapshot, FlowWorkflowInput } from './flow.types';
 import { contextQuery } from '../temporal/workflows/flow-interpreter.workflow';
-import { FLOW_TASK_QUEUE } from './flow.constants';
+import { taskQueueForTenant } from './flow.constants';
+import type { WebhookTriggerConfig } from './steps/trigger.step';
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// workflowIds are formatted as `flow-<flowId>-<executionUuid>`
+// The flowId is embedded at a known position so we can verify tenant ownership
+// without an extra DB round-trip — the full ownership check was already done
+// when the workflow was started (execute()). Here we verify the prefix structure
+// to prevent cross-tenant enumeration via arbitrary workflowId strings.
+function parseWorkflowFlowId(workflowId: string): string | null {
+  const m = /^flow-([0-9a-f-]{36})-[0-9a-f-]{36}$/.exec(workflowId);
+  return m ? m[1] : null;
+}
 
 // ─── DTOs ─────────────────────────────────────────────────────────────────────
 
@@ -58,6 +76,9 @@ export class FlowService {
     @InjectRepository(StepEntity)
     private readonly stepRepo: Repository<StepEntity>,
 
+    @InjectRepository(TenantEntity)
+    private readonly tenantRepo: Repository<TenantEntity>,
+
     private readonly tenantCtx: TenantContextService,
     private readonly temporal: TemporalService,
   ) {}
@@ -95,9 +116,9 @@ export class FlowService {
   }
 
   async findFlow(id: string): Promise<FlowEntity> {
-    const flow = await this.flowRepo.findOne({ where: { id } });
+    const tenantId = this.tenantCtx.getOrThrow();
+    const flow = await this.flowRepo.findOne({ where: { id, tenantId } });
     if (!flow) throw new NotFoundException(`Flow ${id} not found`);
-    this.assertTenant(flow.tenantId);
     flow.steps = await this.stepRepo.find({
       where: { flowId: id },
       order: { position: 'ASC' },
@@ -172,6 +193,11 @@ export class FlowService {
     const tenantId = this.tenantCtx.getOrThrow();
     const workflowId = `flow-${flow.id}-${uuid()}`;
 
+    const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
+    const tier = tenant?.tier ?? 'free';
+    const taskQueue = taskQueueForTenant(tier, tenantId);
+    const credentials = tenant?.credentials ?? {};
+
     const snapshot: FlowSnapshot = {
       id: flow.id,
       name: flow.name,
@@ -189,10 +215,10 @@ export class FlowService {
       })),
     };
 
-    const workflowInput: FlowWorkflowInput = { flow: snapshot, input, tenantId };
+    const workflowInput: FlowWorkflowInput = { flow: snapshot, input, tenantId, credentials };
 
     await this.temporal.getClient().workflow.start('flowInterpreterWorkflow', {
-      taskQueue: FLOW_TASK_QUEUE,
+      taskQueue,
       workflowId,
       args: [workflowInput],
       searchAttributes: {
@@ -206,7 +232,8 @@ export class FlowService {
   }
 
   async getExecution(workflowId: string) {
-    this.tenantCtx.getOrThrow(); // must be in tenant context
+    const tenantId = this.tenantCtx.getOrThrow();
+    await this.assertWorkflowTenant(workflowId, tenantId);
     try {
       const handle = this.temporal.getClient().workflow.getHandle(workflowId);
       const [description, liveContext] = await Promise.all([
@@ -233,6 +260,10 @@ export class FlowService {
     const tenantId = this.tenantCtx.getOrThrow();
     await this.findFlow(flowId); // 404 + tenant guard
 
+    // Validate both values are safe UUIDs before interpolating into Temporal query
+    if (!UUID_RE.test(flowId)) throw new BadRequestException('Invalid flowId');
+    if (!UUID_RE.test(tenantId)) throw new BadRequestException('Invalid tenantId');
+
     const iterator = this.temporal.getClient().workflow.list({
       query: `FlowId="${flowId}" AND TenantId="${tenantId}"`,
     });
@@ -250,9 +281,93 @@ export class FlowService {
   }
 
   async cancelExecution(workflowId: string): Promise<void> {
-    this.tenantCtx.getOrThrow();
+    const tenantId = this.tenantCtx.getOrThrow();
+    await this.assertWorkflowTenant(workflowId, tenantId);
     const handle = this.temporal.getClient().workflow.getHandle(workflowId);
     await handle.cancel();
+  }
+
+  // ── Webhook trigger ────────────────────────────────────────────────────────
+
+  /**
+   * Called from the public webhook endpoint. No session context — the flow
+   * is loaded by (tenantId, flowId) pair directly from the DB. HMAC-SHA256
+   * signature is verified before execution to authenticate the caller.
+   *
+   * Expected header: X-Hub-Signature-256: sha256=<hex>
+   */
+  async webhookTrigger(
+    tenantId: string,
+    flowId: string,
+    rawBody: Buffer,
+    signature: string | undefined,
+    payload: Record<string, unknown>,
+  ): Promise<{ workflowId: string }> {
+    // Load flow bypassing TenantContextService (no session)
+    const flow = await this.flowRepo.findOne({ where: { id: flowId, tenantId } });
+    if (!flow) throw new NotFoundException(`Flow ${flowId} not found`);
+
+    if (flow.status !== 'active') {
+      throw new BadRequestException(`Flow "${flow.name}" is not active`);
+    }
+
+    flow.steps = await this.stepRepo.find({
+      where: { flowId },
+      order: { position: 'ASC' },
+    });
+
+    const triggerStep = flow.steps.find((s) => s.type.startsWith('trigger/'));
+    const triggerConfig = triggerStep?.config as WebhookTriggerConfig | undefined;
+
+    // Verify HMAC if a secret is configured
+    if (triggerConfig?.secret) {
+      if (!signature) {
+        throw new UnauthorizedException('Missing X-Hub-Signature-256 header');
+      }
+      const expected = 'sha256=' + createHmac('sha256', triggerConfig.secret).update(rawBody).digest('hex');
+      const sigBuf = Buffer.from(signature);
+      const expBuf = Buffer.from(expected);
+      if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf)) {
+        throw new UnauthorizedException('Invalid webhook signature');
+      }
+    }
+
+    const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
+    const tier = tenant?.tier ?? 'free';
+    const taskQueue = taskQueueForTenant(tier, tenantId);
+    const credentials = tenant?.credentials ?? {};
+    const workflowId = `flow-${flow.id}-${uuid()}`;
+
+    const snapshot: FlowSnapshot = {
+      id: flow.id,
+      name: flow.name,
+      tenantId,
+      steps: flow.steps.map((s) => ({
+        id: s.id,
+        ref: s.ref,
+        type: s.type,
+        name: s.name,
+        position: s.position,
+        config: s.config,
+        onSuccess: s.onSuccess,
+        onFailure: s.onFailure,
+        retryPolicy: s.retryPolicy,
+      })),
+    };
+
+    const workflowInput: FlowWorkflowInput = { flow: snapshot, input: payload, tenantId, credentials };
+
+    await this.temporal.getClient().workflow.start('flowInterpreterWorkflow', {
+      taskQueue,
+      workflowId,
+      args: [workflowInput],
+      searchAttributes: {
+        FlowId: [flow.id],
+        TenantId: [tenantId],
+      },
+    });
+
+    return { workflowId };
   }
 
   // ── Builtin tools catalogue ────────────────────────────────────────────────
@@ -298,20 +413,73 @@ export class FlowService {
 
   // ── Guards ─────────────────────────────────────────────────────────────────
 
-  private assertTenant(tenantId: string) {
-    const ctx = this.tenantCtx.getTenantId();
-    if (ctx && ctx !== tenantId) throw new ForbiddenException();
+  /**
+   * Verify a workflowId was issued for the current tenant by parsing its
+   * embedded flowId and confirming that flow belongs to the tenant.
+   */
+  private async assertWorkflowTenant(workflowId: string, tenantId: string): Promise<void> {
+    const flowId = parseWorkflowFlowId(workflowId);
+    if (!flowId) throw new ForbiddenException('Invalid workflowId format');
+    // findFlow already enforces tenantId via WHERE clause
+    await this.findFlow(flowId);
+    void tenantId; // tenantId already enforced by findFlow via getOrThrow()
   }
 
-  private validateSteps(steps: CreateStepDto[]) {
-    if (!steps?.length) return;
+  private validateSteps(steps: CreateStepDto[] | null | undefined) {
+    if (!steps || !steps.length) return;
+
     const triggers = steps.filter((s) => s.type.startsWith('trigger/'));
     if (triggers.length !== 1) {
       throw new BadRequestException('Flow must have exactly one trigger step');
     }
-    const trigger = triggers[0];
-    if (trigger.position !== 0) {
+    if (triggers[0].position !== 0) {
       throw new BadRequestException('Trigger step must be at position 0');
+    }
+
+    // Validate refs are unique
+    const refs = steps.map((s) => s.ref);
+    const uniqueRefs = new Set(refs);
+    if (uniqueRefs.size !== refs.length) {
+      throw new BadRequestException('Step refs must be unique within a flow');
+    }
+
+    // Validate onSuccess/onFailure point to existing refs
+    for (const step of steps) {
+      if (step.onSuccess && !uniqueRefs.has(step.onSuccess)) {
+        throw new BadRequestException(`onSuccess ref "${step.onSuccess}" not found`);
+      }
+      if (step.onFailure && !uniqueRefs.has(step.onFailure)) {
+        throw new BadRequestException(`onFailure ref "${step.onFailure}" not found`);
+      }
+    }
+
+    // Cycle detection via DFS
+    const adj = new Map<string, string[]>();
+    for (const step of steps) {
+      const nexts: string[] = [];
+      if (step.onSuccess) nexts.push(step.onSuccess);
+      if (step.onFailure) nexts.push(step.onFailure);
+      adj.set(step.ref, nexts);
+    }
+    const visited = new Set<string>();
+    const inStack = new Set<string>();
+
+    const hasCycle = (ref: string): boolean => {
+      if (inStack.has(ref)) return true;
+      if (visited.has(ref)) return false;
+      visited.add(ref);
+      inStack.add(ref);
+      for (const next of adj.get(ref) ?? []) {
+        if (hasCycle(next)) return true;
+      }
+      inStack.delete(ref);
+      return false;
+    };
+
+    for (const ref of uniqueRefs) {
+      if (hasCycle(ref)) {
+        throw new BadRequestException('Flow steps contain a cycle');
+      }
     }
   }
 }

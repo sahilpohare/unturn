@@ -1,4 +1,5 @@
-import type { StepType, StepConfig, ToolConfig } from './step.entity';
+import type { StepType, StepConfig } from './step.entity';
+import type { ToolConfig } from './steps/agent.step';
 
 // Serialisable snapshot passed to the Temporal workflow as input
 export interface FlowStepSnapshot {
@@ -25,6 +26,13 @@ export interface FlowContext {
   input: Record<string, unknown>;
   steps: Record<string, unknown>; // stepId → output
   tenantId: string;
+  /**
+   * Per-tenant API credentials fetched by the API process at workflow start.
+   * Workers are stateless — they never query the DB.
+   * In production: credentials are encrypted in the DB and decrypted by the
+   * API process before being placed here.
+   */
+  credentials: Record<string, string>;
 }
 
 // Workflow I/O
@@ -32,6 +40,7 @@ export interface FlowWorkflowInput {
   flow: FlowSnapshot;
   input: Record<string, unknown>;
   tenantId: string;
+  credentials: Record<string, string>;
 }
 
 export interface FlowWorkflowOutput {
