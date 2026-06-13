@@ -61,6 +61,25 @@ export class TenantService {
   }
 
   /**
+   * Lists tenants for a user by fetching their better-auth orgs and mapping
+   * slugs to internal tenant UUIDs.
+   */
+  async listForUser(userId: string): Promise<{ id: string; name: string; slug: string }[]> {
+    const orgs = await (this.auth.api.listOrganizations as any)({
+      query: { userId },
+    }).catch(() => null);
+    const orgList: { name: string; slug: string }[] = Array.isArray(orgs) ? orgs : (orgs?.organizations ?? []);
+    if (!orgList.length) return [];
+    const slugs = orgList.map((o) => o.slug).filter(Boolean);
+    const tenants = await this.tenantRepo
+      .createQueryBuilder('t')
+      .where('t.slug IN (:...slugs)', { slugs })
+      .select(['t.id', 't.name', 't.slug'])
+      .getMany();
+    return tenants;
+  }
+
+  /**
    * Returns the tenant's credentials with all values masked except the last 4 chars.
    * Never returns raw tokens to the frontend.
    */

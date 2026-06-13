@@ -84,11 +84,9 @@ export interface Tenant {
 }
 
 export async function listTenants(): Promise<Tenant[]> {
-  const r = await fetch('/api/auth/organization/list', { headers: headers() });
+  const r = await fetch(`${BASE}/tenants/mine`, { headers: headers() });
   if (!r.ok) throw new Error(await r.text());
-  const data = await r.json();
-  // better-auth returns array directly or { organizations: [] }
-  return Array.isArray(data) ? data : (data.organizations ?? []);
+  return r.json();
 }
 
 export async function createTenant(name: string, slug: string): Promise<Tenant> {
