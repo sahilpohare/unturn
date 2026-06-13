@@ -2,9 +2,6 @@ import { useState } from 'react';
 import type { Flow } from './types';
 import * as api from './api';
 import { TenantSwitcher } from './TenantSwitcher';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface Props {
   flows: Flow[];
@@ -17,6 +14,24 @@ interface Props {
   onOpenCredentials: () => void;
 }
 
+const S = {
+  sidebar: {
+    width: 280, flexShrink: 0, display: 'flex', flexDirection: 'column' as const,
+    background: '#071428', borderRight: '1px solid #1a3a6e',
+    fontFamily: "'Rajdhani', system-ui, sans-serif", overflow: 'hidden', height: '100%',
+  },
+  section: { borderBottom: '1px solid #1a3a6e' },
+  sectionLabel: {
+    fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: '#2050a0',
+    letterSpacing: '0.15em', textTransform: 'uppercase' as const,
+  },
+  input: {
+    background: '#040d1a', border: '1px solid #1a3a6e', padding: '6px 10px',
+    color: '#c8deff', fontFamily: "'Share Tech Mono', monospace", fontSize: 12,
+    outline: 'none', width: '100%', boxSizing: 'border-box' as const,
+  },
+};
+
 export function Sidebar({ flows, selectedFlow, onSelectFlow, onRefresh, selectedStep, onLogout, onAddStep, onOpenCredentials }: Props) {
   const [currentTenantId, setCurrentTenantId] = useState('');
   const [newFlowName, setNewFlowName] = useState('');
@@ -25,19 +40,12 @@ export function Sidebar({ flows, selectedFlow, onSelectFlow, onRefresh, selected
   const [runModalOpen, setRunModalOpen] = useState(false);
   const [runArgs, setRunArgs] = useState<Record<string, string>>({});
 
-  function handleTenantSwitch(id: string) {
-    setCurrentTenantId(id);
-    onRefresh();
-  }
+  function handleTenantSwitch(id: string) { setCurrentTenantId(id); onRefresh(); }
 
   async function handleCreate() {
     if (!newFlowName.trim()) return;
-    await api.createFlow({
-      name: newFlowName,
-      steps: [{ ref: 'trigger', type: 'trigger/manual', name: 'Manual Trigger', position: 0, config: {} }],
-    });
-    setNewFlowName('');
-    onRefresh();
+    await api.createFlow({ name: newFlowName, steps: [{ ref: 'trigger', type: 'trigger/manual', name: 'Manual Trigger', position: 0, config: {} }] });
+    setNewFlowName(''); onRefresh();
   }
 
   function openRunModal() {
@@ -46,164 +54,110 @@ export function Sidebar({ flows, selectedFlow, onSelectFlow, onRefresh, selected
     const props = (trigger?.config as any)?.inputSchema?.properties ?? {};
     const defaults: Record<string, string> = {};
     for (const key of Object.keys(props)) defaults[key] = '';
-    setRunArgs(defaults);
-    setRunModalOpen(true);
+    setRunArgs(defaults); setRunModalOpen(true);
   }
 
   async function handleExecute() {
     if (!selectedFlow) return;
-    setExecuting(true);
-    setRunModalOpen(false);
+    setExecuting(true); setRunModalOpen(false);
     try {
       const res = await api.executeFlow(selectedFlow.id, runArgs);
       setLastExecution(res.workflowId);
-    } catch (e: unknown) {
-      alert((e as Error).message);
-    } finally {
-      setExecuting(false);
-    }
+    } catch (e: unknown) { alert((e as Error).message); }
+    finally { setExecuting(false); }
   }
 
   async function handleDelete() {
-    if (!selectedFlow) return;
-    if (!confirm(`Delete "${selectedFlow.name}"?`)) return;
-    await api.deleteFlow(selectedFlow.id);
-    onRefresh();
+    if (!selectedFlow || !confirm(`Delete "${selectedFlow.name}"?`)) return;
+    await api.deleteFlow(selectedFlow.id); onRefresh();
   }
 
   const step = selectedFlow?.steps.find((s) => s.ref === selectedStep);
 
   return (
-    <div className="flex flex-col h-full w-[272px] flex-shrink-0" style={{ background: 'var(--bg-base)', borderRight: '1px solid var(--border-mid)' }}>
+    <div style={S.sidebar}>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid var(--border-mid)' }}>
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded flex items-center justify-center" style={{ background: 'var(--accent-glow)' }}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--accent)' }}>
-              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-            </svg>
-          </div>
-          <span className="font-semibold text-sm tracking-tight" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>Unturn</span>
+      <div style={{ padding: '10px 14px', borderBottom: '1px solid #1a3a6e', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#0a1f3d' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4da6ff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+          </svg>
+          <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 11, fontWeight: 700, color: '#4da6ff', letterSpacing: '0.15em' }}>UNTURN</span>
         </div>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={onOpenCredentials}
-            title="API Credentials"
-            className="w-7 h-7 rounded flex items-center justify-center transition-colors"
-            style={{ color: 'var(--text-muted)' }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)'; }}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="8" cy="15" r="4" />
-              <path d="M10.85 12.15 19 4" />
-              <path d="M18 5l2 2" />
-              <path d="M15 8l2 2" />
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          <IconBtn onClick={onOpenCredentials} title="Credentials">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="8" cy="15" r="4" /><path d="M10.85 12.15 19 4" /><path d="M18 5l2 2" /><path d="M15 8l2 2" />
             </svg>
-          </button>
-          <button
-            onClick={onLogout}
-            className="px-2 py-1 rounded text-xs transition-colors"
-            style={{ color: 'var(--text-muted)' }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.background = 'var(--bg-hover)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'transparent'; }}
-          >
-            Sign out
+          </IconBtn>
+          <button onClick={onLogout} style={{ background: 'none', border: '1px solid #1a3a6e', color: '#2050a0', cursor: 'pointer', fontSize: 10, padding: '3px 8px', fontFamily: "'Share Tech Mono', monospace", letterSpacing: '0.08em' }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#4da6ff'; (e.currentTarget as HTMLElement).style.borderColor = '#4da6ff'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#2050a0'; (e.currentTarget as HTMLElement).style.borderColor = '#1a3a6e'; }}>
+            EXIT
           </button>
         </div>
       </div>
 
-      {/* Tenant switcher */}
-      <div className="px-3 py-3" style={{ borderBottom: '1px solid var(--border-mid)' }}>
-        <div className="text-[10px] font-semibold uppercase tracking-widest mb-2" style={{ color: 'var(--text-muted)' }}>Workspace</div>
+      {/* Tenant */}
+      <div style={{ padding: '10px 14px', ...S.section }}>
+        <div style={{ ...S.sectionLabel, marginBottom: 8 }}>// WORKSPACE</div>
         <TenantSwitcher currentTenantId={currentTenantId} onSwitch={handleTenantSwitch} />
       </div>
 
-      {/* Flow list */}
-      <div className="px-3 py-3" style={{ borderBottom: '1px solid var(--border-mid)' }}>
-        <div className="text-[10px] font-semibold uppercase tracking-widest mb-2" style={{ color: 'var(--text-muted)' }}>Flows</div>
-        <div className="flex gap-2 mb-2">
-          <Input
-            placeholder="New flow name"
+      {/* Flows */}
+      <div style={{ padding: '10px 14px', ...S.section }}>
+        <div style={{ ...S.sectionLabel, marginBottom: 8 }}>// FLOWS</div>
+        <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+          <input
+            placeholder="new_flow_name"
             value={newFlowName}
             onChange={(e) => setNewFlowName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-            className="h-7 text-xs flex-1"
-            style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', color: 'var(--text-primary)' }}
+            style={{ ...S.input, flex: 1 }}
+            onFocus={(e) => { e.target.style.borderColor = '#4da6ff'; }}
+            onBlur={(e) => { e.target.style.borderColor = '#1a3a6e'; }}
           />
-          <Button onClick={handleCreate} size="icon-sm" style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-mid)', color: 'var(--text-secondary)', flexShrink: 0 }}>
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
-          </Button>
+          <button onClick={handleCreate} style={{ background: '#4da6ff', border: 'none', color: '#040d1a', padding: '6px 12px', cursor: 'pointer', fontFamily: "'Orbitron', monospace", fontSize: 10, fontWeight: 700 }}>+</button>
         </div>
-
-        <ScrollArea className="max-h-48">
+        <div style={{ maxHeight: 200, overflowY: 'auto' }}>
           {flows.length === 0 ? (
-            <div className="text-xs text-center py-4" style={{ color: 'var(--text-muted)' }}>
-              Select a workspace to load flows.
+            <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: '#2a4a7a', padding: '8px 0' }}>
+              &gt; SELECT WORKSPACE TO LOAD
             </div>
-          ) : (
-            <div className="space-y-0.5">
-              {flows.map((f) => (
-                <div
-                  key={f.id}
-                  onClick={() => onSelectFlow(f)}
-                  className="px-2.5 py-2 rounded-lg cursor-pointer transition-all group"
-                  style={{
-                    background: selectedFlow?.id === f.id ? 'var(--bg-hover)' : 'transparent',
-                    border: `1px solid ${selectedFlow?.id === f.id ? 'var(--border-hi)' : 'transparent'}`,
-                  }}
-                  onMouseEnter={(e) => { if (selectedFlow?.id !== f.id) e.currentTarget.style.background = 'var(--bg-elevated)'; }}
-                  onMouseLeave={(e) => { if (selectedFlow?.id !== f.id) e.currentTarget.style.background = 'transparent'; }}
-                >
-                  <div className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>{f.name}</div>
-                  <div className="text-[10px] mt-0.5" style={{ color: statusColor(f.status) }}>{f.status}</div>
-                </div>
-              ))}
+          ) : flows.map((f) => (
+            <div key={f.id} onClick={() => onSelectFlow(f)} style={{
+              padding: '7px 10px', cursor: 'pointer', marginBottom: 2,
+              background: selectedFlow?.id === f.id ? '#0a1f3d' : 'transparent',
+              border: `1px solid ${selectedFlow?.id === f.id ? '#4da6ff' : '#1a3a6e'}`,
+              transition: 'all 0.1s',
+            }}
+              onMouseEnter={(e) => { if (selectedFlow?.id !== f.id) (e.currentTarget as HTMLElement).style.borderColor = '#2050a0'; }}
+              onMouseLeave={(e) => { if (selectedFlow?.id !== f.id) (e.currentTarget as HTMLElement).style.borderColor = '#1a3a6e'; }}
+            >
+              <div style={{ fontSize: 13, fontWeight: 600, color: selectedFlow?.id === f.id ? '#4da6ff' : '#c8deff', letterSpacing: '0.03em' }}>{f.name}</div>
+              <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: statusColor(f.status), marginTop: 2 }}>STATUS: {f.status?.toUpperCase()}</div>
             </div>
-          )}
-        </ScrollArea>
+          ))}
+        </div>
       </div>
 
-      {/* Selected flow actions */}
+      {/* Flow actions */}
       {selectedFlow && (
-        <div className="px-3 py-3" style={{ borderBottom: '1px solid var(--border-mid)' }}>
-          <div className="text-[10px] font-semibold uppercase tracking-widest mb-1" style={{ color: 'var(--text-muted)' }}>
-            {selectedFlow.name}
+        <div style={{ padding: '10px 14px', ...S.section }}>
+          <div style={{ ...S.sectionLabel, marginBottom: 4 }}>// {selectedFlow.name.toUpperCase()}</div>
+          <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: '#2a4a7a', marginBottom: 10 }}>
+            STEPS: {selectedFlow.steps?.length ?? 0} &nbsp;|&nbsp; {selectedFlow.status?.toUpperCase()}
           </div>
-          <div className="text-[10px] mb-3" style={{ color: 'var(--text-muted)' }}>
-            {selectedFlow.steps?.length ?? 0} steps · {selectedFlow.status}
+          <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
+            <Btn onClick={onAddStep} color="#4da6ff">+ STEP</Btn>
+            <Btn onClick={openRunModal} color="#4affa0" disabled={executing || selectedFlow.status !== 'active'}>
+              {executing ? '...' : '▶ RUN'}
+            </Btn>
           </div>
-          <div className="flex gap-2 mb-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={onAddStep}
-              className="flex-1 h-7 text-xs"
-              style={{ borderColor: 'var(--border-mid)', color: 'var(--text-secondary)', background: 'var(--bg-elevated)' }}
-            >
-              + Step
-            </Button>
-            <Button
-              size="sm"
-              onClick={openRunModal}
-              disabled={executing || selectedFlow.status !== 'active'}
-              className="flex-1 h-7 text-xs"
-              style={{ background: 'var(--success)', color: '#fff', opacity: selectedFlow.status !== 'active' ? 0.4 : 1 }}
-            >
-              {executing ? '…' : 'Run'}
-            </Button>
-          </div>
-          <Button
-            size="sm"
-            variant="destructive"
-            onClick={handleDelete}
-            className="w-full h-7 text-xs"
-          >
-            Delete flow
-          </Button>
+          <Btn onClick={handleDelete} color="#ff4a6e" full>DELETE FLOW</Btn>
           {lastExecution && (
-            <div className="text-[10px] mt-2 break-all" style={{ color: 'var(--success)' }}>
-              Started: {lastExecution}
+            <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: '#4affa0', marginTop: 8, wordBreak: 'break-all' }}>
+              WF: {lastExecution}
             </div>
           )}
         </div>
@@ -215,56 +169,36 @@ export function Sidebar({ flows, selectedFlow, onSelectFlow, onRefresh, selected
         const props = (trigger?.config as any)?.inputSchema?.properties ?? {};
         const keys = Object.keys(props);
         return (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center"
-            style={{ background: 'rgba(0,0,0,0.7)' }}
-            onClick={() => setRunModalOpen(false)}
-          >
-            <div
-              className="rounded-xl w-[400px] flex flex-col gap-4 p-6"
-              style={{ background: 'var(--bg-card)', border: '1px solid var(--border-mid)', boxShadow: '0 24px 64px #000c' }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
-                Run: {selectedFlow.name}
+          <div style={{ position: 'fixed', inset: 0, background: '#040d1acc', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setRunModalOpen(false)}>
+            <div style={{ background: '#071428', border: '1px solid #2050a0', width: 400, padding: 24, position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+              {/* Corner marks */}
+              <div style={{ position: 'absolute', top: -1, left: -1, width: 12, height: 12, borderTop: '2px solid #4da6ff', borderLeft: '2px solid #4da6ff' }} />
+              <div style={{ position: 'absolute', top: -1, right: -1, width: 12, height: 12, borderTop: '2px solid #4da6ff', borderRight: '2px solid #4da6ff' }} />
+              <div style={{ position: 'absolute', bottom: -1, left: -1, width: 12, height: 12, borderBottom: '2px solid #4da6ff', borderLeft: '2px solid #4da6ff' }} />
+              <div style={{ position: 'absolute', bottom: -1, right: -1, width: 12, height: 12, borderBottom: '2px solid #4da6ff', borderRight: '2px solid #4da6ff' }} />
+
+              <div style={{ fontFamily: "'Orbitron', monospace", fontSize: 11, color: '#4da6ff', letterSpacing: '0.12em', marginBottom: 16 }}>
+                EXECUTE: {selectedFlow.name.toUpperCase()}
               </div>
-              {keys.length === 0 && (
-                <div className="text-xs" style={{ color: 'var(--text-muted)' }}>No input args defined on trigger.</div>
-              )}
+              {keys.length === 0 && <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 11, color: '#2a4a7a', marginBottom: 12 }}>&gt; NO INPUT PARAMS</div>}
               {keys.map((key) => (
-                <div key={key}>
-                  <div className="text-[10px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--text-secondary)' }}>
-                    {key}
-                    {props[key].description && (
-                      <span className="ml-2 font-normal lowercase normal-case" style={{ color: 'var(--text-muted)' }}>— {props[key].description}</span>
-                    )}
-                  </div>
-                  <Input
+                <div key={key} style={{ marginBottom: 12 }}>
+                  <div style={{ ...S.sectionLabel, marginBottom: 6 }}>// {key.toUpperCase()}</div>
+                  <input
                     value={runArgs[key] ?? ''}
                     onChange={(e) => setRunArgs((prev) => ({ ...prev, [key]: e.target.value }))}
                     placeholder={props[key].description ?? key}
-                    className="text-xs h-8"
-                    style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', color: 'var(--text-primary)' }}
+                    style={S.input}
+                    onFocus={(e) => { e.target.style.borderColor = '#4da6ff'; }}
+                    onBlur={(e) => { e.target.style.borderColor = '#1a3a6e'; }}
                   />
                 </div>
               ))}
-              <div className="flex gap-2 mt-1">
-                <Button
-                  variant="outline"
-                  className="flex-1 h-8 text-xs"
-                  onClick={() => setRunModalOpen(false)}
-                  style={{ borderColor: 'var(--border-mid)', color: 'var(--text-secondary)', background: 'var(--bg-elevated)' }}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  className="flex-1 h-8 text-xs"
-                  onClick={handleExecute}
-                  disabled={executing}
-                  style={{ background: 'var(--success)', color: '#fff' }}
-                >
-                  {executing ? 'Starting…' : 'Run'}
-                </Button>
+              <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                <Btn onClick={() => setRunModalOpen(false)} color="#2050a0" full>CANCEL</Btn>
+                <Btn onClick={handleExecute} color="#4affa0" disabled={executing} full>
+                  {executing ? 'STARTING...' : '▶ EXECUTE'}
+                </Btn>
               </div>
             </div>
           </div>
@@ -273,57 +207,75 @@ export function Sidebar({ flows, selectedFlow, onSelectFlow, onRefresh, selected
 
       {/* Step inspector */}
       {step && (
-        <ScrollArea className="flex-1 px-3 py-3">
-          <div className="text-[10px] font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--text-muted)' }}>
-            Step Inspector
-          </div>
-          <div className="space-y-2">
-            <Field label="Name" value={step.name} />
-            <Field label="Type" value={step.type} />
-            <Field label="Ref" value={step.ref} />
-            <Field label="Position" value={String(step.position)} />
-            {step.onSuccess && <Field label="On Success" value={step.onSuccess} color="var(--success)" />}
-            {step.onFailure && <Field label="On Failure" value={step.onFailure} color="var(--danger)" />}
-            <Field
-              label="Retries"
-              value={`${step.retryPolicy?.maximumAttempts ?? 3} × ${step.retryPolicy?.initialInterval ?? '1s'}`}
-              color="var(--warning)"
-            />
-          </div>
-          <div className="text-[10px] font-semibold uppercase tracking-wide mt-4 mb-1.5" style={{ color: 'var(--text-muted)' }}>Config</div>
-          <pre className="rounded-lg p-3 text-[10px] overflow-auto max-h-48" style={{ background: 'var(--bg-void)', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+        <div style={{ padding: '10px 14px', flex: 1, overflowY: 'auto' }}>
+          <div style={{ ...S.sectionLabel, marginBottom: 10 }}>// STEP INSPECTOR</div>
+          <Field label="NAME" value={step.name} />
+          <Field label="TYPE" value={step.type} mono />
+          <Field label="REF" value={step.ref} mono />
+          <Field label="POS" value={String(step.position)} mono />
+          {step.onSuccess && <Field label="ON_SUCCESS" value={step.onSuccess} color="#4affa0" mono />}
+          {step.onFailure && <Field label="ON_FAILURE" value={step.onFailure} color="#ff4a6e" mono />}
+          <Field label="RETRIES" value={`${step.retryPolicy?.maximumAttempts ?? 3}x ${step.retryPolicy?.initialInterval ?? '1s'}`} color="#ffda4a" mono />
+          <div style={{ ...S.sectionLabel, marginTop: 10, marginBottom: 6 }}>// CONFIG</div>
+          <pre style={{ background: '#040d1a', border: '1px solid #1a3a6e', padding: 10, fontSize: 10, color: '#6a9fd8', overflow: 'auto', maxHeight: 180, fontFamily: "'Share Tech Mono', monospace" }}>
             {JSON.stringify(step.config, null, 2)}
           </pre>
-        </ScrollArea>
+        </div>
       )}
 
       {/* Footer */}
-      <div className="px-3 py-3 mt-auto" style={{ borderTop: '1px solid var(--border-mid)' }}>
-        <a
-          href="/api/docs"
-          target="_blank"
-          rel="noreferrer"
-          className="text-xs hover:underline"
-          style={{ color: 'var(--text-muted)' }}
-        >
-          API Docs (Swagger)
+      <div style={{ padding: '8px 14px', borderTop: '1px solid #1a3a6e', marginTop: 'auto', background: '#040d1a' }}>
+        <a href="/api/docs" target="_blank" rel="noreferrer"
+          style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: '#2a4a7a', textDecoration: 'none', letterSpacing: '0.1em' }}
+          onMouseEnter={(e) => { (e.target as HTMLElement).style.color = '#4da6ff'; }}
+          onMouseLeave={(e) => { (e.target as HTMLElement).style.color = '#2a4a7a'; }}>
+          SYS.DOCS →
         </a>
       </div>
     </div>
   );
 }
 
-function Field({ label, value, color }: { label: string; value: string; color?: string }) {
+function Field({ label, value, color, mono }: { label: string; value: string; color?: string; mono?: boolean }) {
   return (
-    <div className="flex items-baseline gap-1.5">
-      <span className="text-[10px] flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{label}</span>
-      <span className="text-xs font-mono truncate" style={{ color: color ?? 'var(--text-primary)' }}>{value}</span>
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 5 }}>
+      <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: '#2050a0', minWidth: 80, flexShrink: 0 }}>{label}</span>
+      <span style={{ fontSize: mono ? 11 : 12, color: color ?? '#c8deff', fontFamily: mono ? "'Share Tech Mono', monospace" : 'inherit', wordBreak: 'break-all' }}>{value}</span>
     </div>
   );
 }
 
 function statusColor(s: string) {
-  if (s === 'active') return 'var(--success)';
-  if (s === 'disabled') return 'var(--danger)';
-  return 'var(--text-muted)';
+  if (s === 'active') return '#4affa0';
+  if (s === 'disabled') return '#ff4a6e';
+  return '#2a4a7a';
+}
+
+function Btn({ onClick, color, disabled, full, children }: { onClick: () => void; color: string; disabled?: boolean; full?: boolean; children: React.ReactNode }) {
+  return (
+    <button onClick={onClick} disabled={disabled} style={{
+      flex: full ? undefined : 1, width: full ? '100%' : undefined,
+      padding: '6px 0', background: disabled ? '#0a1f3d' : 'transparent',
+      border: `1px solid ${disabled ? '#1a3a6e' : color}`,
+      color: disabled ? '#2a4a7a' : color,
+      fontFamily: "'Orbitron', monospace", fontSize: 9, fontWeight: 700,
+      letterSpacing: '0.12em', cursor: disabled ? 'not-allowed' : 'pointer',
+      transition: 'all 0.1s',
+    }}
+      onMouseEnter={(e) => { if (!disabled) (e.currentTarget as HTMLElement).style.background = color + '20'; }}
+      onMouseLeave={(e) => { if (!disabled) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function IconBtn({ onClick, title, children }: { onClick: () => void; title: string; children: React.ReactNode }) {
+  return (
+    <button onClick={onClick} title={title} style={{ background: 'none', border: '1px solid #1a3a6e', color: '#2050a0', cursor: 'pointer', width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#4da6ff'; (e.currentTarget as HTMLElement).style.borderColor = '#4da6ff'; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#2050a0'; (e.currentTarget as HTMLElement).style.borderColor = '#1a3a6e'; }}>
+      {children}
+    </button>
+  );
 }

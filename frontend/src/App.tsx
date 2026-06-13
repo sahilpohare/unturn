@@ -31,22 +31,14 @@ export default function App() {
   }
 
   const refresh = useCallback(async () => {
-    try {
-      const list = await api.listFlows();
-      setFlows(list);
-    } catch {
-      setFlows([]);
-    }
+    try { const list = await api.listFlows(); setFlows(list); }
+    catch { setFlows([]); }
   }, []);
 
   async function selectFlow(flow: Flow) {
     setSelectedStep(null);
-    try {
-      const full = await api.getFlow(flow.id);
-      setSelectedFlow(full);
-    } catch {
-      setSelectedFlow(flow);
-    }
+    try { const full = await api.getFlow(flow.id); setSelectedFlow(full); }
+    catch { setSelectedFlow(flow); }
   }
 
   function handleStepSaved(updated: Flow) {
@@ -63,7 +55,7 @@ export default function App() {
   if (!token) return <LoginPage onLogin={handleLogin} />;
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bg-void)' }}>
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#040d1a' }}>
       <Sidebar
         flows={flows}
         selectedFlow={selectedFlow}
@@ -84,27 +76,13 @@ export default function App() {
       </ReactFlowProvider>
 
       {addingStep && selectedFlow && (
-        <AddStepPanel
-          flow={selectedFlow}
-          onClose={() => setAddingStep(false)}
-          onSaved={handleStepSaved}
-        />
+        <AddStepPanel flow={selectedFlow} onClose={() => setAddingStep(false)} onSaved={handleStepSaved} />
       )}
-
       {editingStep && selectedFlow && (
-        <AddStepPanel
-          flow={selectedFlow}
-          editStep={editingStep}
-          onClose={() => setEditingStep(null)}
-          onSaved={handleStepSaved}
-        />
+        <AddStepPanel flow={selectedFlow} editStep={editingStep} onClose={() => setEditingStep(null)} onSaved={handleStepSaved} />
       )}
-
       {showCredentials && (
-        <CredentialsPanel
-          tenantId={api.getTenantId()}
-          onClose={() => setShowCredentials(false)}
-        />
+        <CredentialsPanel tenantId={api.getTenantId()} onClose={() => setShowCredentials(false)} />
       )}
     </div>
   );

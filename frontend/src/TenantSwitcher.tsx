@@ -1,12 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { listTenants, createTenant, setTenantId, type Tenant } from './api';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 
 interface Props {
   onSwitch: (tenantId: string) => void;
   currentTenantId: string;
 }
+
+const inp: React.CSSProperties = {
+  background: '#040d1a', border: '1px solid #1a3a6e', padding: '6px 10px',
+  color: '#c8deff', fontFamily: "'Share Tech Mono', monospace", fontSize: 11,
+  outline: 'none', width: '100%', boxSizing: 'border-box',
+};
 
 export function TenantSwitcher({ onSwitch, currentTenantId }: Props) {
   const [tenants, setTenants] = useState<Tenant[]>([]);
@@ -17,9 +21,7 @@ export function TenantSwitcher({ onSwitch, currentTenantId }: Props) {
   const [error, setError] = useState('');
   const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    listTenants().then(setTenants).catch(() => setTenants([]));
-  }, []);
+  useEffect(() => { listTenants().then(setTenants).catch(() => setTenants([])); }, []);
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -31,122 +33,88 @@ export function TenantSwitcher({ onSwitch, currentTenantId }: Props) {
 
   const current = tenants.find((t) => t.id === currentTenantId);
 
-  function select(t: Tenant) {
-    setTenantId(t.id);
-    onSwitch(t.id);
-    setOpen(false);
-  }
+  function select(t: Tenant) { setTenantId(t.id); onSwitch(t.id); setOpen(false); }
 
   async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
-    setError('');
+    e.preventDefault(); setError('');
     try {
       const t = await createTenant(newName, newSlug);
       setTenants((prev) => [...prev, t]);
-      setNewName('');
-      setNewSlug('');
-      setCreating(false);
-      select(t);
-    } catch (err) {
-      setError((err as Error).message);
-    }
+      setNewName(''); setNewSlug(''); setCreating(false); select(t);
+    } catch (err) { setError((err as Error).message); }
   }
 
   return (
-    <div ref={ref} className="relative">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm transition-colors"
-        style={{
-          background: 'var(--bg-elevated)',
-          border: '1px solid var(--border-mid)',
-          color: 'var(--text-primary)',
-        }}
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button onClick={() => setOpen((o) => !o)} style={{
+        display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+        background: '#040d1a', border: '1px solid #1a3a6e', padding: '7px 10px',
+        cursor: 'pointer', color: '#c8deff', fontFamily: "'Rajdhani', system-ui, sans-serif",
+      }}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = '#2050a0'; }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = '#1a3a6e'; }}
       >
-        <span className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0 text-xs font-bold"
-          style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}>
-          {(current?.name ?? 'T')[0].toUpperCase()}
+        <div style={{ width: 18, height: 18, background: '#0a1f3d', border: '1px solid #2050a0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#4da6ff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="0" /><path d="M9 3v18M3 9h6M3 15h6" />
+          </svg>
+        </div>
+        <span style={{ flex: 1, textAlign: 'left', fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: current ? '#c8deff' : '#2a4a7a' }}>
+          {current?.name ?? (currentTenantId ? currentTenantId.slice(0, 12) + '…' : 'SELECT WORKSPACE')}
         </span>
-        <span className="flex-1 text-left truncate" style={{ color: current ? 'var(--text-primary)' : 'var(--text-muted)' }}>
-          {current?.name ?? (currentTenantId ? currentTenantId.slice(0, 8) + '…' : 'Select tenant')}
-        </span>
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" style={{ color: 'var(--text-muted)', transform: open ? 'rotate(180deg)' : undefined, transition: 'transform 0.15s' }}>
-          <path d="M5 7L1 3h8L5 7z" />
-        </svg>
+        <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: '#2050a0' }}>{open ? '▲' : '▼'}</span>
       </button>
 
       {open && (
-        <div className="absolute top-full mt-1.5 left-0 right-0 rounded-lg overflow-hidden z-50"
-          style={{ background: 'var(--bg-card)', border: '1px solid var(--border-mid)', boxShadow: '0 8px 32px #0009' }}>
+        <div style={{ position: 'absolute', top: 'calc(100% + 2px)', left: 0, right: 0, zIndex: 100, background: '#071428', border: '1px solid #2050a0', boxShadow: '0 8px 32px #000c' }}>
           {tenants.length === 0 && !creating && (
-            <div className="px-3 py-3 text-xs" style={{ color: 'var(--text-muted)' }}>No tenants yet.</div>
+            <div style={{ padding: '10px 12px', fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: '#2a4a7a' }}>&gt; NO WORKSPACES</div>
           )}
-
           {tenants.map((t) => (
-            <div
-              key={t.id}
-              onClick={() => select(t)}
-              className="flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-colors"
-              style={{
-                background: t.id === currentTenantId ? 'var(--bg-hover)' : 'transparent',
-                borderLeft: `2px solid ${t.id === currentTenantId ? 'var(--accent)' : 'transparent'}`,
-              }}
-              onMouseEnter={(e) => { if (t.id !== currentTenantId) e.currentTarget.style.background = 'var(--bg-elevated)'; }}
-              onMouseLeave={(e) => { if (t.id !== currentTenantId) e.currentTarget.style.background = 'transparent'; }}
+            <div key={t.id} onClick={() => select(t)} style={{
+              padding: '8px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8,
+              background: t.id === currentTenantId ? '#0a1f3d' : 'transparent',
+              borderLeft: `2px solid ${t.id === currentTenantId ? '#4da6ff' : 'transparent'}`,
+            }}
+              onMouseEnter={(e) => { if (t.id !== currentTenantId) (e.currentTarget as HTMLElement).style.background = '#0a1f3d40'; }}
+              onMouseLeave={(e) => { if (t.id !== currentTenantId) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
             >
-              <span className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0 text-xs font-bold"
-                style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}>
-                {t.name[0].toUpperCase()}
-              </span>
-              <div className="flex-1 min-w-0">
-                <div className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>{t.name}</div>
-                <div className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{t.slug}</div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: t.id === currentTenantId ? '#4da6ff' : '#c8deff' }}>{t.name}</div>
+                <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: '#2a4a7a' }}>{t.slug}</div>
               </div>
-              {t.id === currentTenantId && (
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'var(--accent)', flexShrink: 0 }}>
-                  <polyline points="2 6 5 9 10 3" />
-                </svg>
-              )}
+              {t.id === currentTenantId && <span style={{ marginLeft: 'auto', fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: '#4da6ff' }}>✓</span>}
             </div>
           ))}
 
-          <div style={{ borderTop: '1px solid var(--border-mid)' }}>
+          <div style={{ borderTop: '1px solid #1a3a6e' }}>
             {!creating ? (
-              <button
-                onClick={() => setCreating(true)}
-                className="w-full px-3 py-2 text-xs text-left transition-colors"
-                style={{ color: 'var(--text-secondary)', background: 'transparent' }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-elevated)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+              <button onClick={() => setCreating(true)} style={{
+                width: '100%', padding: '8px 12px', background: 'none', border: 'none',
+                color: '#2050a0', fontFamily: "'Orbitron', monospace", fontSize: 9,
+                cursor: 'pointer', textAlign: 'left', letterSpacing: '0.1em',
+              }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#4da6ff'; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#2050a0'; }}
               >
-                + New tenant
+                + NEW WORKSPACE
               </button>
             ) : (
-              <form onSubmit={handleCreate} className="p-3 flex flex-col gap-2">
-                <Input
-                  placeholder="Name"
-                  value={newName}
-                  onChange={(e) => {
-                    setNewName(e.target.value);
-                    if (!newSlug) setNewSlug(e.target.value.toLowerCase().replace(/\s+/g, '-'));
-                  }}
-                  autoFocus
-                  required
-                  className="h-7 text-xs"
-                  style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', color: 'var(--text-primary)' }}
+              <form onSubmit={handleCreate} style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <input placeholder="name" value={newName} autoFocus required style={inp}
+                  onChange={(e) => { setNewName(e.target.value); if (!newSlug) setNewSlug(e.target.value.toLowerCase().replace(/\s+/g, '-')); }}
+                  onFocus={(e) => { e.target.style.borderColor = '#4da6ff'; }}
+                  onBlur={(e) => { e.target.style.borderColor = '#1a3a6e'; }}
                 />
-                <Input
-                  placeholder="Slug"
-                  value={newSlug}
+                <input placeholder="slug" value={newSlug} required style={inp}
                   onChange={(e) => setNewSlug(e.target.value)}
-                  required
-                  className="h-7 text-xs"
-                  style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', color: 'var(--text-primary)' }}
+                  onFocus={(e) => { e.target.style.borderColor = '#4da6ff'; }}
+                  onBlur={(e) => { e.target.style.borderColor = '#1a3a6e'; }}
                 />
-                {error && <div className="text-xs" style={{ color: '#fca5a5' }}>{error}</div>}
-                <div className="flex gap-2">
-                  <Button type="submit" size="xs" className="flex-1" style={{ background: 'var(--text-primary)', color: 'var(--bg-void)' }}>Create</Button>
-                  <Button type="button" size="xs" variant="outline" className="flex-1" onClick={() => { setCreating(false); setError(''); }}>Cancel</Button>
+                {error && <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: '#ff4a6e' }}>ERR: {error}</div>}
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <button type="submit" style={{ flex: 1, padding: '5px 0', background: '#4da6ff', border: 'none', color: '#040d1a', fontFamily: "'Orbitron', monospace", fontSize: 9, fontWeight: 700, cursor: 'pointer', letterSpacing: '0.1em' }}>CREATE</button>
+                  <button type="button" onClick={() => { setCreating(false); setError(''); }} style={{ flex: 1, padding: '5px 0', background: 'transparent', border: '1px solid #1a3a6e', color: '#2050a0', fontFamily: "'Orbitron', monospace", fontSize: 9, cursor: 'pointer', letterSpacing: '0.1em' }}>CANCEL</button>
                 </div>
               </form>
             )}
