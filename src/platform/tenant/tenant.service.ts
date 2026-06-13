@@ -27,9 +27,16 @@ export class TenantService {
   ) {}
 
   async create(dto: CreateTenantDto) {
-    return this.auth.api.createOrganization({
+    const org = await this.auth.api.createOrganization({
       body: { name: dto.name, slug: dto.slug, userId: dto.userId },
     });
+    // Also persist to the tenants table so internal UUID is available
+    const existing = await this.tenantRepo.findOne({ where: { slug: dto.slug } });
+    if (!existing) {
+      const tenant = this.tenantRepo.create({ name: dto.name, slug: dto.slug });
+      await this.tenantRepo.save(tenant);
+    }
+    return org;
   }
 
   async findById(id: string) {
@@ -61,22 +68,31 @@ export class TenantService {
   }
 
   /**
-   * Lists tenants for a user by fetching their better-auth orgs and mapping
-   * slugs to internal tenant UUIDs.
+   * Lists tenants for a user. Calls better-auth listOrganizations (requires
+   * the user's bearer token so better-auth can resolve the session), then
+   * maps slugs → internal tenant UUIDs, auto-creating rows for legacy orgs.
    */
-  async listForUser(userId: string): Promise<{ id: string; name: string; slug: string }[]> {
-    const orgs = await (this.auth.api.listOrganizations as any)({
-      query: { userId },
-    }).catch(() => null);
-    const orgList: { name: string; slug: string }[] = Array.isArray(orgs) ? orgs : (orgs?.organizations ?? []);
-    if (!orgList.length) return [];
-    const slugs = orgList.map((o) => o.slug).filter(Boolean);
-    const tenants = await this.tenantRepo
+  async listForUser(bearerToken: string): Promise<{ id: string; name: string; slug: string }[]> {
+    const orgs: { name: string; slug: string }[] = await (this.auth.api.listOrganizations as any)({
+      headers: { authorization: `Bearer ${bearerToken}` },
+    });
+    if (!orgs?.length) return [];
+
+    // Ensure every org has a corresponding tenant row (handles legacy orgs)
+    for (const org of orgs) {
+      const existing = await this.tenantRepo.findOne({ where: { slug: org.slug } });
+      if (!existing) {
+        const tenant = this.tenantRepo.create({ name: org.name, slug: org.slug });
+        await this.tenantRepo.save(tenant);
+      }
+    }
+
+    const slugs = orgs.map((o) => o.slug);
+    return this.tenantRepo
       .createQueryBuilder('t')
       .where('t.slug IN (:...slugs)', { slugs })
       .select(['t.id', 't.name', 't.slug'])
       .getMany();
-    return tenants;
   }
 
   /**
