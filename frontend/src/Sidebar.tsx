@@ -85,7 +85,7 @@ export function Sidebar({ flows, selectedFlow, onSelectFlow, onRefresh, selected
           <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 11, fontWeight: 700, color: '#4da6ff', letterSpacing: '0.15em' }}>UNTURN</span>
         </div>
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-          <IconBtn onClick={onOpenCredentials} title="Credentials">
+          <IconBtn onClick={currentTenantId ? onOpenCredentials : () => {}} title={currentTenantId ? 'Credentials' : 'Select a workspace first'}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="8" cy="15" r="4" /><path d="M10.85 12.15 19 4" /><path d="M18 5l2 2" /><path d="M15 8l2 2" />
             </svg>

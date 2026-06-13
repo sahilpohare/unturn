@@ -81,7 +81,7 @@ export default function App() {
       {editingStep && selectedFlow && (
         <AddStepPanel flow={selectedFlow} editStep={editingStep} onClose={() => setEditingStep(null)} onSaved={handleStepSaved} />
       )}
-      {showCredentials && (
+      {showCredentials && api.getTenantId() && (
         <CredentialsPanel tenantId={api.getTenantId()} onClose={() => setShowCredentials(false)} />
       )}
     </div>
