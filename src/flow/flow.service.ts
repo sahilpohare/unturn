@@ -429,11 +429,8 @@ export class FlowService {
     if (!steps || !steps.length) return;
 
     const triggers = steps.filter((s) => s.type.startsWith('trigger/'));
-    if (triggers.length !== 1) {
-      throw new BadRequestException('Flow must have exactly one trigger step');
-    }
-    if (triggers[0].position !== 0) {
-      throw new BadRequestException('Trigger step must be at position 0');
+    if (triggers.length === 0) {
+      throw new BadRequestException('Flow must have at least one trigger step');
     }
 
     // Validate refs are unique

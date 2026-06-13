@@ -112,9 +112,8 @@ export function AddStepPanel({ flow, onClose, onSaved, editStep }: Props) {
       if (isEdit) {
         allSteps = existing.map((s) => s.id === editStep.id ? { ...s, name: name.trim(), config, onSuccess: onSuccess || null, onFailure: onFailure || null, retryPolicy } : s);
       } else {
-        const base = isTrigger ? existing.filter((s) => !s.type.startsWith('trigger/')) : existing;
-        const newStep = { ref: ref.trim(), type: selected.type, name: name.trim(), position: isTrigger ? 0 : base.length, config, onSuccess: onSuccess || null, onFailure: onFailure || null, retryPolicy };
-        allSteps = isTrigger ? [newStep, ...base.map((s, i) => ({ ...s, position: i + 1 }))] : [...base, newStep];
+        const newStep = { ref: ref.trim(), type: selected.type, name: name.trim(), position: existing.length, config, onSuccess: onSuccess || null, onFailure: onFailure || null, retryPolicy };
+        allSteps = [...existing, newStep];
       }
       const saved = await api.upsertSteps(flow.id, allSteps);
       onSaved({ ...flow, steps: saved as any }); onClose();
