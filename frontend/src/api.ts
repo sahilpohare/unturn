@@ -90,13 +90,17 @@ export async function listTenants(): Promise<Tenant[]> {
 }
 
 export async function createTenant(name: string, slug: string): Promise<Tenant> {
-  const r = await fetch('/api/auth/organization/create', {
+  const r = await fetch(`${BASE}/tenants`, {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify({ name, slug }),
   });
   if (!r.ok) throw new Error(await r.text());
-  return r.json();
+  // After creating the org, fetch our internal tenant row with real UUID
+  const list = await listTenants();
+  const found = list.find((t) => t.slug === slug);
+  if (found) return found;
+  throw new Error('Tenant created but not found');
 }
 
 export type CredentialKey =

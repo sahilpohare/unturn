@@ -21,7 +21,12 @@ export function TenantSwitcher({ onSwitch, currentTenantId }: Props) {
   const [error, setError] = useState('');
   const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { listTenants().then(setTenants).catch(() => setTenants([])); }, []);
+  useEffect(() => {
+    listTenants().then((list) => {
+      setTenants(list);
+      if (list.length > 0 && !currentTenantId) select(list[0]);
+    }).catch(() => setTenants([]));
+  }, []);
 
   useEffect(() => {
     function handler(e: MouseEvent) {
