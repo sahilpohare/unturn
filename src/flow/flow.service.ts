@@ -186,8 +186,8 @@ export class FlowService {
   ): Promise<{ workflowId: string }> {
     const flow = await this.findFlow(flowId);
 
-    if (flow.status !== 'active') {
-      throw new BadRequestException(`Flow "${flow.name}" is not active`);
+    if (flow.status === 'disabled') {
+      throw new BadRequestException(`Flow "${flow.name}" is disabled`);
     }
 
     const tenantId = this.tenantCtx.getOrThrow();

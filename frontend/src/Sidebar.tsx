@@ -150,7 +150,7 @@ export function Sidebar({ flows, selectedFlow, onSelectFlow, onRefresh, selected
           </div>
           <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
             <Btn onClick={onAddStep} color="#4da6ff">+ STEP</Btn>
-            <Btn onClick={openRunModal} color="#4affa0" disabled={executing || selectedFlow.status !== 'active'}>
+            <Btn onClick={openRunModal} color="#4affa0" disabled={executing}>
               {executing ? '...' : '▶ RUN'}
             </Btn>
           </div>
