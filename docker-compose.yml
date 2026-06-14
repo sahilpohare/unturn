@@ -1,4 +1,7 @@
 services:
+
+  # ── Infrastructure ──────────────────────────────────────────────────────────
+
   postgres:
     image: postgres:16-alpine
     environment:
@@ -24,13 +27,21 @@ services:
       - POSTGRES_PWD=postgres
       - POSTGRES_SEEDS=postgres
       - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
+      - PROMETHEUS_ENDPOINT=0.0.0.0:9090
     ports:
       - '7233:7233'
+      - '9090:9090'   # Temporal Prometheus metrics
     volumes:
       - ./temporal-config:/etc/temporal/config/dynamicconfig
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'temporal', 'operator', 'cluster', 'health']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   temporal-ui:
     image: temporalio/ui:2.26.2
@@ -42,5 +53,164 @@ services:
     depends_on:
       - temporal
 
+  # ── Application ─────────────────────────────────────────────────────────────
+
+  api:
+    build:
+      context: .
+      target: runner
+    command: node dist/main.js
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/nestdb
+      TEMPORAL_ADDRESS: temporal:7233
+      BETTER_AUTH_URL: http://localhost:3000
+    ports:
+      - '3000:3000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      temporal:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:3000/ || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+  # ── Tier workers ────────────────────────────────────────────────────────────
+  # Each runs the same image with a different TASK_QUEUE.
+  # Scale replicas independently: docker compose up --scale worker-free=4
+
+  worker-free:
+    build:
+      context: .
+      target: runner
+    command: node dist/temporal/worker.js
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/nestdb
+      TEMPORAL_ADDRESS: temporal:7233
+      TASK_QUEUE: flow-free
+      MAX_CONCURRENT_ACTS: '5'
+      MAX_ACTS_PER_SECOND: '2'
+    depends_on:
+      temporal:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+
+  worker-pro:
+    build:
+      context: .
+      target: runner
+    command: node dist/temporal/worker.js
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/nestdb
+      TEMPORAL_ADDRESS: temporal:7233
+      TASK_QUEUE: flow-pro
+      MAX_CONCURRENT_ACTS: '20'
+      MAX_ACTS_PER_SECOND: '10'
+    depends_on:
+      temporal:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      replicas: 3
+
+  # Enterprise workers are provisioned per-tenant by your infra automation.
+  # Uncomment and replace <tenantId> with the actual tenant UUID:
+  #
+  # worker-enterprise-acme:
+  #   build: { context: ., target: runner }
+  #   command: node dist/temporal/worker.js
+  #   env_file: .env
+  #   environment:
+  #     NODE_ENV: production
+  #     DATABASE_URL: postgres://postgres:postgres@postgres:5432/nestdb
+  #     TEMPORAL_ADDRESS: temporal:7233
+  #     TASK_QUEUE: flow-enterprise-<tenantId>
+  #     MAX_CONCURRENT_ACTS: '50'
+  #     MAX_ACTS_PER_SECOND: '25'
+  #   depends_on:
+  #     temporal:
+  #       condition: service_healthy
+  #   restart: unless-stopped
+
+  # ── Demo / walkthrough ───────────────────────────────────────────────────────
+  # One-shot service that runs the walkthrough script against the running stack.
+  # Usage: docker compose run --rm walkthrough
+  # Override env to target a specific brand:
+  #   WEBSITE_URL=https://glossier.com META_PAGE_ID=123 docker compose run --rm walkthrough
+
+  walkthrough:
+    image: alpine:3.19
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - |
+        apk add --no-cache curl jq bash && bash /scripts/walkthrough.sh
+    environment:
+      BASE_URL: http://api:3000
+      WEBSITE_URL: ${WEBSITE_URL:-https://www.nike.com/ie/}
+      META_PAGE_ID: ${META_PAGE_ID:-}
+      DEMO_EMAIL: ${DEMO_EMAIL:-demo@unturn.io}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-demo-password-123}
+      WORKSPACE_NAME: ${WORKSPACE_NAME:-Demo Workspace}
+      WORKSPACE_SLUG: ${WORKSPACE_SLUG:-demo}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      META_ACCESS_TOKEN: ${META_ACCESS_TOKEN:-}
+      INSTAGRAM_ACCESS_TOKEN: ${INSTAGRAM_ACCESS_TOKEN:-}
+      INSTAGRAM_USER_ID: ${INSTAGRAM_USER_ID:-}
+    volumes:
+      - ./scripts:/scripts:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    profiles:
+      - walkthrough   # only runs with: docker compose --profile walkthrough run --rm walkthrough
+
+  # ── Observability ───────────────────────────────────────────────────────────
+
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    ports:
+      - '9091:9090'
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=7d'
+    depends_on:
+      - temporal
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    ports:
+      - '3001:3000'
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
 volumes:
   postgres_data:
+  prometheus_data:
+  grafana_data:
