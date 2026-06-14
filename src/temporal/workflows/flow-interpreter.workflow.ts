@@ -7,7 +7,7 @@ import type {
   FlowContext,
   FlowStepSnapshot,
 } from '../../flow/flow.types';
-import type { DelayStepConfig } from '../../flow/step.entity';
+import type { DelayStepConfig } from '../../flow/steps/delay.step';
 
 const { executeStep } = proxyActivities<typeof flowActivities>({
   startToCloseTimeout: '10 minutes',
@@ -34,6 +34,7 @@ export async function flowInterpreterWorkflow(
     input: input.input,
     steps: {},
     tenantId,
+    credentials: input.credentials ?? {},
   };
 
   // Expose live context via query

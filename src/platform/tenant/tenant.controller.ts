@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Headers, HttpCode, Param, Post, Patch } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, Patch } from '@nestjs/common';
 import { Session, AllowAnonymous } from '@thallesp/nestjs-better-auth';
 import type { UserSession } from '@thallesp/nestjs-better-auth';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
@@ -11,9 +11,8 @@ export class TenantController {
   constructor(private readonly tenantService: TenantService) {}
 
   @Get('mine')
-  listMine(@Headers('authorization') auth: string) {
-    const token = auth?.replace(/^Bearer\s+/i, '') ?? '';
-    return this.tenantService.listForUser(token);
+  listMine(@Session() session: UserSession) {
+    return this.tenantService.listForUser(session.user.id);
   }
 
   @Post()

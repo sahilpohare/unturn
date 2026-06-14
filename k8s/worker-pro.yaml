@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker-pro
+  labels:
+    app: worker
+    tier: pro
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: worker
+      tier: pro
+  template:
+    metadata:
+      labels:
+        app: worker
+        tier: pro
+    spec:
+      containers:
+        - name: worker
+          image: unturn/worker:latest
+          command: ['node', 'dist/temporal/worker.js']
+          env:
+            - name: TASK_QUEUE
+              value: flow-pro
+            - name: TEMPORAL_ADDRESS
+              value: temporal:7233
+            - name: MAX_CONCURRENT_ACTS
+              value: '20'
+            - name: MAX_ACTS_PER_SECOND
+              value: '10'
+          envFrom:
+            - secretRef:
+                name: unturn-secrets
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: worker-pro-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: worker-pro
+  minReplicas: 2
+  maxReplicas: 20
+  metrics:
+    - type: External
+      external:
+        metric:
+          name: temporal_activity_task_queue_depth
+          selector:
+            matchLabels:
+              task_queue: flow-pro
+        target:
+          type: AverageValue
+          averageValue: '5'

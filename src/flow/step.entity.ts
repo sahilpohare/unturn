@@ -6,8 +6,19 @@ import {
   Unique,
   UpdateDateColumn,
 } from 'typeorm';
+import type { WebhookTriggerConfig, ScheduleTriggerConfig, ManualTriggerConfig } from './steps/trigger.step';
+import type { AgentStepConfig } from './steps/agent.step';
+import type { HttpStepConfig } from './steps/http.step';
+import type { TransformStepConfig } from './steps/transform.step';
+import type { ConditionStepConfig } from './steps/condition.step';
+import type { DelayStepConfig } from './steps/delay.step';
+import type { BrandResearchConfig } from './steps/brand-research.step';
+import type { MetaAdsSearchConfig } from './steps/meta-ads-search.step';
+import type { CreatorVetConfig } from './steps/creator-vet.step';
+import type { InstagramDmConfig } from './steps/instagram-dm.step';
 
-// ─── Trigger subtypes ─────────────────────────────────────────────────────────
+export type { AgentStepConfig } from './steps/agent.step';
+export type { ToolConfig } from './steps/agent.step';
 
 export type TriggerSubtype = 'webhook' | 'schedule' | 'manual';
 export type StepType =
@@ -21,112 +32,6 @@ export type StepType =
   | 'meta-ads-search'
   | 'creator-vet'
   | 'instagram-dm';
-
-// ─── Config shapes (stored as JSONB) ─────────────────────────────────────────
-
-export interface WebhookTriggerConfig {
-  secret?: string;
-  /** JSONPath — only proceed if expression is truthy */
-  filter?: string;
-}
-
-export interface ScheduleTriggerConfig {
-  cron: string;
-  timezone?: string;
-}
-
-export interface ManualTriggerConfig {
-  /** JSON Schema describing expected input */
-  inputSchema?: Record<string, unknown>;
-}
-
-/** A tool the agent can call during this step */
-export interface ToolConfig {
-  name: string;
-  type: 'http' | 'builtin';
-  description: string;
-  /** JSON Schema for the tool's parameters */
-  inputSchema: Record<string, unknown>;
-  http?: {
-    url: string;
-    method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-    headers?: Record<string, string>;
-  };
-  /** For type='builtin': registered tool identifier */
-  builtinId?: string;
-}
-
-export interface AgentStepConfig {
-  agentName: string;
-  /** Handlebars template: "Summarise: {{input.text}}" */
-  promptTemplate: string;
-  tools: ToolConfig[];
-  threadIdPath?: string;   // JSONPath into FlowContext e.g. "$.input.threadId"
-  resourceIdPath?: string; // JSONPath into FlowContext e.g. "$.input.userId"
-}
-
-export interface HttpStepConfig {
-  url: string;
-  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-  headers?: Record<string, string>;
-  body?: unknown;
-}
-
-export interface TransformStepConfig {
-  /** output key → JSONPath expression on FlowContext */
-  mapping: Record<string, string>;
-}
-
-export interface ConditionStepConfig {
-  /** JSONPath expression — truthy = onTrue branch */
-  expression: string;
-  onTrue: string;
-  onFalse: string;
-}
-
-export interface DelayStepConfig {
-  duration: string; // '30s' | '5m' | '2h'
-}
-
-// ─── Outreach step configs ────────────────────────────────────────────────────
-
-export interface BrandResearchConfig {
-  /** JSONPath or literal website URL */
-  websiteUrl: string;
-  /** Optional extra pages to scrape e.g. '/products', '/about' */
-  extraPaths?: string[];
-}
-
-export interface MetaAdsSearchConfig {
-  /** Facebook Page ID of the brand */
-  pageIdPath: string; // JSONPath e.g. '$.input.metaPageId' or literal
-  /** ISO 3166 country code(s) e.g. ['US'] */
-  countries: string[];
-  /** Max ads to retrieve */
-  limit?: number;
-  /** Meta Graph API access token — pulled from env if omitted */
-  accessToken?: string;
-}
-
-export interface CreatorVetConfig {
-  /** JSONPath to array of Instagram handles from a prior step */
-  handlesPath: string;
-  /** Min followers */
-  minFollowers?: number;
-  /** Max creators to pass through */
-  topN?: number;
-}
-
-export interface InstagramDmConfig {
-  /** JSONPath to Instagram user ID to DM */
-  recipientIdPath: string;
-  /** JSONPath to message text (from agent output) */
-  messagePath: string;
-  /** Instagram Graph API access token — pulled from env if omitted */
-  accessToken?: string;
-  /** Delay between DMs in ms (rate limiting) */
-  delayMs?: number;
-}
 
 export type StepConfig =
   | WebhookTriggerConfig

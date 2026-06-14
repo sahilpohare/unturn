@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker-free
+  labels:
+    app: worker
+    tier: free
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: worker
+      tier: free
+  template:
+    metadata:
+      labels:
+        app: worker
+        tier: free
+    spec:
+      containers:
+        - name: worker
+          image: unturn/worker:latest
+          command: ['node', 'dist/temporal/worker.js']
+          env:
+            - name: TASK_QUEUE
+              value: flow-free
+            - name: TEMPORAL_ADDRESS
+              value: temporal:7233
+            - name: MAX_CONCURRENT_ACTS
+              value: '5'
+            - name: MAX_ACTS_PER_SECOND
+              value: '2'
+          envFrom:
+            - secretRef:
+                name: unturn-secrets
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+# HPA driven by Temporal queue depth via prometheus-adapter
+# Requires: kube-prometheus-stack + prometheus-adapter installed
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: worker-free-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: worker-free
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+    - type: External
+      external:
+        metric:
+          name: temporal_activity_task_queue_depth
+          selector:
+            matchLabels:
+              task_queue: flow-free
+        target:
+          type: AverageValue
+          # Scale up when average queue depth exceeds 5 tasks per pod
+          averageValue: '5'

@@ -1,14 +1,50 @@
 import { ApplicationFailure } from '@temporalio/activity';
+import { Agent } from '@mastra/core/agent';
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
-import type { FlowContext, ExecuteStepOutput, ToolConfig } from '../flow.types';
-import type { AgentStepConfig } from '../step.entity';
+import type { FlowContext, ExecuteStepOutput } from '../flow.types';
 import { BaseStep } from './base.step';
+import { IS_MOCK_LLM, IS_MOCK_APIS, getMockLlmResponse, getMockFetchResponse } from './mock-responses';
+
+export interface ToolConfig {
+  name: string;
+  type: 'http' | 'builtin';
+  description: string;
+  inputSchema: Record<string, unknown>;
+  http?: {
+    url: string;
+    method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+    headers?: Record<string, string>;
+  };
+  builtinId?: string;
+}
+
+export interface AgentStepConfig {
+  agentName: string;
+  systemPrompt?: string;
+  promptTemplate: string;
+  tools: ToolConfig[];
+  threadIdPath?: string;
+  resourceIdPath?: string;
+}
 
 // ─── Builtin tool registry ────────────────────────────────────────────────────
+// Factory receives FlowContext so tools can read per-tenant credentials.
 
-const builtinRegistry: Record<string, (input: Record<string, unknown>) => Promise<unknown>> = {
+function buildBuiltinRegistry(context: FlowContext): Record<string, (input: Record<string, unknown>) => Promise<unknown>> {
+  const creds = context.credentials ?? {};
+  // Fall back to process.env for local dev / non-multitenant runner
+  const metaToken = creds.metaAccessToken ?? process.env.META_ACCESS_TOKEN;
+  const igToken = creds.instagramAccessToken ?? process.env.INSTAGRAM_ACCESS_TOKEN;
+  const igUserId = creds.instagramUserId ?? process.env.INSTAGRAM_USER_ID;
+
+  return {
   'scrape-url': async ({ url }) => {
+    if (IS_MOCK_APIS) {
+      const mock = getMockFetchResponse(url as string);
+      console.log(`[MOCK] scrape-url(${url})`);
+      return mock ?? { url, text: '[MOCK] Page content for ' + url };
+    }
     const res = await fetch(url as string, {
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; OutreachBot/1.0)' },
     });
@@ -25,8 +61,12 @@ const builtinRegistry: Record<string, (input: Record<string, unknown>) => Promis
   },
 
   'meta-ad-library': async ({ pageId, countries = 'US', limit = 50 }) => {
-    const token = process.env.META_ACCESS_TOKEN;
-    if (!token) throw new Error('META_ACCESS_TOKEN env var not set');
+    if (IS_MOCK_APIS) {
+      console.log(`[MOCK] meta-ad-library(pageId=${pageId})`);
+      return getMockFetchResponse('ads_archive');
+    }
+    const token = metaToken;
+    if (!token) throw new Error('metaAccessToken not set for this tenant');
     const params = new URLSearchParams({
       search_page_ids: pageId as string,
       ad_type: 'ALL',
@@ -41,7 +81,11 @@ const builtinRegistry: Record<string, (input: Record<string, unknown>) => Promis
   },
 
   'instagram-profile': async ({ handle }) => {
-    const token = process.env.INSTAGRAM_ACCESS_TOKEN;
+    if (IS_MOCK_APIS) {
+      console.log(`[MOCK] instagram-profile(${handle})`);
+      return { ...(getMockFetchResponse('graph.facebook.com') as object), username: handle };
+    }
+    const token = igToken;
     if (token) {
       const res = await fetch(
         `https://graph.facebook.com/v20.0/${handle}?fields=name,biography,followers_count,follows_count,media_count,profile_picture_url&access_token=${token}`,
@@ -56,6 +100,10 @@ const builtinRegistry: Record<string, (input: Record<string, unknown>) => Promis
   },
 
   'search-instagram-creators': async ({ hashtag, limit = 20 }) => {
+    if (IS_MOCK_APIS) {
+      console.log(`[MOCK] search-instagram-creators(${hashtag})`);
+      return getMockFetchResponse('instagram.com/explore/tags');
+    }
     const tag = (hashtag as string).replace(/^#/, '');
     const url = `https://www.instagram.com/explore/tags/${encodeURIComponent(tag)}/`;
     const res = await fetch(url, {
@@ -76,27 +124,49 @@ const builtinRegistry: Record<string, (input: Record<string, unknown>) => Promis
   },
 
   'send-instagram-dm': async ({ recipientId, message }) => {
-    const token = process.env.INSTAGRAM_ACCESS_TOKEN;
-    const igUserId = process.env.INSTAGRAM_USER_ID;
-    if (!token) throw new Error('INSTAGRAM_ACCESS_TOKEN not set');
-    if (!igUserId) throw new Error('INSTAGRAM_USER_ID not set');
+    if (IS_MOCK_APIS) {
+      console.log(`[MOCK] send-instagram-dm(to=${recipientId}, msg="${String(message).slice(0, 60)}...")`);
+      return { recipient_id: recipientId, message_id: 'mock-msg-' + Date.now(), status: 'sent' };
+    }
+    if (!igToken) throw new Error('instagramAccessToken not set for this tenant');
+    if (!igUserId) throw new Error('instagramUserId not set for this tenant');
     const res = await fetch(`https://graph.facebook.com/v20.0/${igUserId}/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ recipient: { id: recipientId }, message: { text: message }, access_token: token }),
+      body: JSON.stringify({ recipient: { id: recipientId }, message: { text: message }, access_token: igToken }),
     });
     if (!res.ok) throw new Error(`Instagram DM ${res.status}: ${await res.text()}`);
     return res.json();
   },
-};
+  }; // end registry object
+} // end buildBuiltinRegistry
 
 export class AgentStep extends BaseStep<AgentStepConfig> {
   async execute(context: FlowContext): Promise<ExecuteStepOutput> {
-    const { mastraInstance } = await import('../../temporal/activities/mastra-singleton.js');
-    const agent = (mastraInstance as any).getAgent(this.config.agentName);
-    if (!agent) {
-      throw ApplicationFailure.nonRetryable(`Agent "${this.config.agentName}" not found`);
+    // Mock LLM path — returns canned response, no API call made
+    if (IS_MOCK_LLM) {
+      const store = process.env.MOCK_STORE;
+      const text = getMockLlmResponse(this.config.agentName, store);
+      console.log(`[MOCK LLM] agent=${this.config.agentName} store=${store ?? 'default'}`);
+      return { output: { text, toolCalls: [] } };
     }
+
+    const model = process.env.OPENAI_MODEL ?? 'openai/gpt-4o-mini';
+
+    // Build tools from the step config — only the ones this step needs
+    const builtinRegistry = buildBuiltinRegistry(context);
+    const tools = Object.fromEntries(
+      (this.config.tools ?? []).map((tc) => [tc.name, AgentStep.buildTool(tc, builtinRegistry)]),
+    );
+
+    // Agent constructed at runtime from JSON — no singleton lookup
+    const agent = new Agent({
+      id: this.config.agentName,
+      name: this.config.agentName,
+      instructions: this.config.systemPrompt ?? 'You are a helpful assistant.',
+      model,
+      tools,
+    });
 
     const prompt = this.resolveTemplate(this.config.promptTemplate, context);
     const threadId = this.config.threadIdPath
@@ -115,7 +185,7 @@ export class AgentStep extends BaseStep<AgentStepConfig> {
 
   // ── Static factory for building Mastra tools from ToolConfig ───────────────
 
-  static buildTool(toolConfig: ToolConfig) {
+  static buildTool(toolConfig: ToolConfig, builtinRegistry: Record<string, (input: Record<string, unknown>) => Promise<unknown>>) {
     const shape: Record<string, z.ZodTypeAny> = {};
     const props = (toolConfig.inputSchema?.properties ?? {}) as Record<string, { type?: string; description?: string }>;
     for (const [key, def] of Object.entries(props)) {

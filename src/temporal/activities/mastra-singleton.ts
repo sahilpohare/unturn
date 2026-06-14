@@ -2,18 +2,20 @@ import { Mastra } from '@mastra/core/mastra';
 import { Agent } from '@mastra/core/agent';
 
 /**
- * Lightweight Mastra instance used only by Temporal activities.
- * Activities run in Node.js (not the workflow V8 sandbox), so this is safe.
- * The NestJS DI Mastra instance is separate — this avoids coupling Temporal
- * workers to the NestJS container lifecycle.
+ * Minimal singleton used only by specialised step classes that need a
+ * pre-configured agent (e.g. BrandResearchStep).
+ *
+ * AgentStep constructs agents at runtime from flow JSON — no registration here.
  */
+const model = process.env.OPENAI_MODEL ?? 'openai/gpt-4o-mini';
+
 export const mastraInstance = new Mastra({
   agents: {
-    'example-agent': new Agent({
-      id: 'example-agent',
-      name: 'example-agent',
-      instructions: 'You are a helpful assistant.',
-      model: 'openai/gpt-4o-mini',
+    'outreach-research-agent': new Agent({
+      id: 'outreach-research-agent',
+      name: 'outreach-research-agent',
+      instructions: 'You are a brand analyst. Extract brand identity from website content and return structured JSON.',
+      model,
     }),
   },
 });

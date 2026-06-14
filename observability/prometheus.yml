@@ -1,0 +1,14 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Temporal server metrics — includes activity_task_queue_depth per task queue
+  - job_name: temporal
+    static_configs:
+      - targets: ['temporal:9090']
+    metric_relabel_configs:
+      # Keep only the metrics relevant to queue depth and worker scaling
+      - source_labels: [__name__]
+        regex: 'temporal_(activity_task_queue_depth|workflow_task_queue_depth|activity_schedule_to_start_latency.*|workflow_task_schedule_to_start_latency.*|activity_execution_failed.*|activity_task_queue_poll_succeed.*)'
+        action: keep

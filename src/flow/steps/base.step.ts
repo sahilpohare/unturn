@@ -1,5 +1,26 @@
+import { ApplicationFailure } from '@temporalio/activity';
 import type { FlowContext, ExecuteStepOutput } from '../flow.types';
 import type { FlowStepSnapshot } from '../flow.types';
+
+// ── SSRF guard ──────────────────────────────────────────────────────────────
+// Block private/loopback/link-local IP ranges and non-http(s) schemes.
+const PRIVATE_IP_RE =
+  /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|::1|fc|fd|fe80)/i;
+
+export function assertPublicUrl(raw: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw ApplicationFailure.nonRetryable(`Invalid URL: ${raw}`);
+  }
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw ApplicationFailure.nonRetryable(`Disallowed URL scheme: ${parsed.protocol}`);
+  }
+  if (PRIVATE_IP_RE.test(parsed.hostname)) {
+    throw ApplicationFailure.nonRetryable(`Disallowed private/loopback URL: ${raw}`);
+  }
+}
 
 export abstract class BaseStep<TConfig = unknown> {
   protected readonly config: TConfig;

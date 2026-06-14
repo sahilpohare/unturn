@@ -1,12 +1,17 @@
 import { ApplicationFailure } from '@temporalio/activity';
 import type { FlowContext, ExecuteStepOutput } from '../flow.types';
-import type { MetaAdsSearchConfig } from '../step.entity';
 import { BaseStep } from './base.step';
+
+export interface MetaAdsSearchConfig {
+  pageIdPath: string;
+  countries: string[];
+  limit?: number;
+}
 
 export class MetaAdsSearchStep extends BaseStep<MetaAdsSearchConfig> {
   async execute(context: FlowContext): Promise<ExecuteStepOutput> {
     const pageId = this.resolvePath(this.config.pageIdPath, context) as string ?? this.config.pageIdPath;
-    const token = this.config.accessToken ?? process.env.META_ACCESS_TOKEN;
+    const token = process.env.META_ACCESS_TOKEN;
 
     if (!token) throw ApplicationFailure.nonRetryable('META_ACCESS_TOKEN not set');
 

@@ -1,6 +1,11 @@
 import type { FlowContext, ExecuteStepOutput } from '../flow.types';
-import type { ConditionStepConfig } from '../step.entity';
 import { BaseStep } from './base.step';
+
+export interface ConditionStepConfig {
+  expression: string;
+  onTrue: string;
+  onFalse: string;
+}
 
 export class ConditionStep extends BaseStep<ConditionStepConfig> {
   async execute(context: FlowContext): Promise<ExecuteStepOutput> {

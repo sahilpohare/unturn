@@ -1,6 +1,11 @@
 import type { FlowContext, ExecuteStepOutput } from '../flow.types';
-import type { CreatorVetConfig } from '../step.entity';
 import { BaseStep } from './base.step';
+
+export interface CreatorVetConfig {
+  handlesPath: string;
+  minFollowers?: number;
+  topN?: number;
+}
 
 export class CreatorVetStep extends BaseStep<CreatorVetConfig> {
   async execute(context: FlowContext): Promise<ExecuteStepOutput> {
@@ -47,7 +52,9 @@ export class CreatorVetStep extends BaseStep<CreatorVetConfig> {
           profilePicUrl: profile.profile_picture_url ?? '',
           score: Math.round(followerScore + bioScore + verifiedScore),
         });
-      } catch { }
+      } catch (err) {
+        console.warn(`[CreatorVetStep] failed to fetch profile for @${handle}:`, err);
+      }
     }
 
     return { output: { creators: creators.sort((a, b) => b.score - a.score).slice(0, topN) } };

@@ -1,15 +1,46 @@
 import { ApplicationFailure } from '@temporalio/activity';
 import type { FlowContext, ExecuteStepOutput } from '../flow.types';
-import type { BrandResearchConfig } from '../step.entity';
-import { BaseStep } from './base.step';
+import { BaseStep, assertPublicUrl } from './base.step';
+import { IS_MOCK_LLM, IS_MOCK_APIS, getMockLlmResponse } from './mock-responses';
+
+export interface BrandResearchConfig {
+  websiteUrl: string;
+  extraPaths?: string[];
+}
 
 export class BrandResearchStep extends BaseStep<BrandResearchConfig> {
   async execute(context: FlowContext): Promise<ExecuteStepOutput> {
     const baseUrl = this.resolvePath(this.config.websiteUrl, context) as string ?? this.config.websiteUrl;
+    assertPublicUrl(baseUrl);
     const paths = [baseUrl, ...(this.config.extraPaths ?? []).map((p) => `${baseUrl.replace(/\/$/, '')}${p}`)];
+
+    // Mock path — skip real scraping and LLM call
+    if (IS_MOCK_LLM) {
+      const store = process.env.MOCK_STORE;
+      console.log(`[MOCK] brand-research(${baseUrl}) store=${store ?? 'default'}`);
+      const text = getMockLlmResponse('outreach-research-agent', store);
+      let parsed: any = {};
+      try { parsed = JSON.parse(text); } catch { parsed = { title: baseUrl, description: text }; }
+      return {
+        output: {
+          url: baseUrl,
+          title: parsed.title ?? baseUrl,
+          description: parsed.description ?? '',
+          rawText: '[MOCK] scraped content',
+          products: parsed.products ?? [],
+          ...parsed,
+        },
+      };
+    }
 
     const pages: string[] = [];
     for (const url of paths) {
+      assertPublicUrl(url);
+      // Real scraper always runs unless IS_MOCK_APIS is true
+      if (IS_MOCK_APIS) {
+        pages.push(`[MOCK] content for ${url}`);
+        continue;
+      }
       const res = await fetch(url, {
         headers: { 'User-Agent': 'Mozilla/5.0 (compatible; OutreachBot/1.0)' },
       });

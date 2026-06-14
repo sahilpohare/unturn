@@ -1,5 +1,5 @@
 import type { ExecuteStepInput, ExecuteStepOutput } from '../../flow/flow.types';
-import { createStep } from '../../flow/steps/index.js';
+import { createStep } from '../../flow/steps/index';
 
 export async function executeStep(input: ExecuteStepInput): Promise<ExecuteStepOutput> {
   const step = createStep(input.step);

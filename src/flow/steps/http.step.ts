@@ -1,11 +1,18 @@
 import { ApplicationFailure } from '@temporalio/activity';
 import type { FlowContext, ExecuteStepOutput } from '../flow.types';
-import type { HttpStepConfig } from '../step.entity';
-import { BaseStep } from './base.step';
+import { BaseStep, assertPublicUrl } from './base.step';
+
+export interface HttpStepConfig {
+  url: string;
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  headers?: Record<string, string>;
+  body?: unknown;
+}
 
 export class HttpStep extends BaseStep<HttpStepConfig> {
   async execute(context: FlowContext): Promise<ExecuteStepOutput> {
     const url = this.resolveTemplate(this.config.url, context);
+    assertPublicUrl(url);
     const res = await fetch(url, {
       method: this.config.method,
       headers: { 'Content-Type': 'application/json', ...(this.config.headers ?? {}) },

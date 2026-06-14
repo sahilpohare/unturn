@@ -1,6 +1,6 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import type { Auth } from '../auth/auth.instance';
 import { AUTH_INSTANCE } from '../auth/auth-infra.module';
 import { TenantEntity } from './tenant.entity';
@@ -24,6 +24,7 @@ export class TenantService {
   constructor(
     @Inject(AUTH_INSTANCE) private readonly auth: Auth,
     @InjectRepository(TenantEntity) private readonly tenantRepo: Repository<TenantEntity>,
+    private readonly dataSource: DataSource,
   ) {}
 
   async create(dto: CreateTenantDto) {
@@ -68,22 +69,23 @@ export class TenantService {
   }
 
   /**
-   * Lists tenants for a user. Calls better-auth listOrganizations (requires
-   * the user's bearer token so better-auth can resolve the session), then
-   * maps slugs → internal tenant UUIDs, auto-creating rows for legacy orgs.
+   * Lists tenants for a user by joining better-auth member/organization tables
+   * (same DB), then mapping slugs to internal tenant UUIDs. Auto-creates
+   * tenant rows for orgs that were created before this mapping existed.
    */
-  async listForUser(bearerToken: string): Promise<{ id: string; name: string; slug: string }[]> {
-    const orgs: { name: string; slug: string }[] = await (this.auth.api.listOrganizations as any)({
-      headers: { authorization: `Bearer ${bearerToken}` },
-    });
-    if (!orgs?.length) return [];
+  async listForUser(userId: string): Promise<{ id: string; name: string; slug: string }[]> {
+    const orgs: { name: string; slug: string }[] = await this.dataSource.query(
+      `SELECT o.name, o.slug FROM "organization" o
+       JOIN "member" m ON m."organizationId" = o.id
+       WHERE m."userId" = $1`,
+      [userId],
+    );
+    if (!orgs.length) return [];
 
-    // Ensure every org has a corresponding tenant row (handles legacy orgs)
     for (const org of orgs) {
       const existing = await this.tenantRepo.findOne({ where: { slug: org.slug } });
       if (!existing) {
-        const tenant = this.tenantRepo.create({ name: org.name, slug: org.slug });
-        await this.tenantRepo.save(tenant);
+        await this.tenantRepo.save(this.tenantRepo.create({ name: org.name, slug: org.slug }));
       }
     }
 

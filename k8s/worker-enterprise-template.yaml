@@ -1,0 +1,74 @@
+# Template for per-tenant enterprise worker.
+# Your infra automation (Terraform, Helm, Pulumi) renders this with TENANT_ID.
+#
+# Example: envsubst < worker-enterprise-template.yaml | kubectl apply -f -
+#   with TENANT_ID=acme-corp-uuid
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker-enterprise-${TENANT_ID}
+  labels:
+    app: worker
+    tier: enterprise
+    tenant: ${TENANT_ID}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worker
+      tier: enterprise
+      tenant: ${TENANT_ID}
+  template:
+    metadata:
+      labels:
+        app: worker
+        tier: enterprise
+        tenant: ${TENANT_ID}
+    spec:
+      containers:
+        - name: worker
+          image: unturn/worker:latest
+          command: ['node', 'dist/temporal/worker.js']
+          env:
+            - name: TASK_QUEUE
+              value: flow-enterprise-${TENANT_ID}
+            - name: TEMPORAL_ADDRESS
+              value: temporal:7233
+            - name: MAX_CONCURRENT_ACTS
+              value: '50'
+            - name: MAX_ACTS_PER_SECOND
+              value: '25'
+          envFrom:
+            - secretRef:
+                name: unturn-secrets
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: worker-enterprise-${TENANT_ID}-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: worker-enterprise-${TENANT_ID}
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+    - type: External
+      external:
+        metric:
+          name: temporal_activity_task_queue_depth
+          selector:
+            matchLabels:
+              task_queue: flow-enterprise-${TENANT_ID}
+        target:
+          type: AverageValue
+          averageValue: '5'

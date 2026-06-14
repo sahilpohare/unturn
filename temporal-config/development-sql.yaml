@@ -5,3 +5,12 @@ limit.maxIDLength:
 system.forceSearchAttributesCacheRefreshOnRead:
   - value: true
     constraints: {}
+
+# Expose per-task-queue metrics so Prometheus can drive HPA
+system.enableReadFromSecondary:
+  - value: false
+    constraints: {}
+
+frontend.enableActivityEagerExecution:
+  - value: true
+    constraints: {}

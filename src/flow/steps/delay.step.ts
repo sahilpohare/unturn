@@ -1,6 +1,9 @@
 import type { FlowContext, ExecuteStepOutput } from '../flow.types';
-import type { DelayStepConfig } from '../step.entity';
 import { BaseStep } from './base.step';
+
+export interface DelayStepConfig {
+  duration: string; // '30s' | '5m' | '2h'
+}
 
 export class DelayStep extends BaseStep<DelayStepConfig> {
   async execute(_context: FlowContext): Promise<ExecuteStepOutput> {

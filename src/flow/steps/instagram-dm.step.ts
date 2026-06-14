@@ -1,13 +1,18 @@
 import { ApplicationFailure } from '@temporalio/activity';
 import type { FlowContext, ExecuteStepOutput } from '../flow.types';
-import type { InstagramDmConfig } from '../step.entity';
 import { BaseStep } from './base.step';
+
+export interface InstagramDmConfig {
+  recipientIdPath: string;
+  messagePath: string;
+  delayMs?: number;
+}
 
 export class InstagramDmStep extends BaseStep<InstagramDmConfig> {
   async execute(context: FlowContext): Promise<ExecuteStepOutput> {
     const recipientId = this.resolvePath(this.config.recipientIdPath, context) as string;
     const message = this.resolvePath(this.config.messagePath, context) as string;
-    const token = this.config.accessToken ?? process.env.INSTAGRAM_ACCESS_TOKEN;
+    const token = process.env.INSTAGRAM_ACCESS_TOKEN;
     const igUserId = process.env.INSTAGRAM_USER_ID;
 
     if (!token) throw ApplicationFailure.nonRetryable('INSTAGRAM_ACCESS_TOKEN not set');
