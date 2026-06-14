@@ -1,0 +1,179 @@
+{
+  "agents": [
+    {
+      "id": "ugc-creator-outreach",
+      "name": "UGC Creator Outreach Agent",
+      "description": "Researches a brand, finds relevant UGC creators on Instagram, and sends personalised outreach DMs.",
+      "skills": ["brand-intelligence", "creator-discovery", "personalised-outreach"],
+      "flow": {
+        "steps": [
+          {
+            "ref": "trigger",
+            "type": "trigger/manual",
+            "name": "Start",
+            "position": 0,
+            "config": {
+              "inputSchema": {
+                "properties": {
+                  "websiteUrl": { "type": "string", "description": "Brand website URL" },
+                  "niche": { "type": "string", "description": "Fashion niche / hashtag seed e.g. streetwear" }
+                }
+              }
+            },
+            "onSuccess": "brand-research",
+            "retryPolicy": { "maximumAttempts": 1 }
+          },
+          {
+            "ref": "brand-research",
+            "type": "brand-research",
+            "name": "Brand Intelligence",
+            "position": 1,
+            "config": { "websiteUrl": "$.input.websiteUrl" },
+            "onSuccess": "find-creators",
+            "retryPolicy": { "maximumAttempts": 2, "initialInterval": "2s" }
+          },
+          {
+            "ref": "find-creators",
+            "type": "agent",
+            "name": "Discover UGC Creators",
+            "position": 2,
+            "config": {
+              "agentName": "ugcResearchAgent",
+              "systemPrompt": "You are a talent scout for fashion brands. Your job is to discover authentic UGC creators on Instagram who match a brand's aesthetic, tone, and target audience. Always think about fit: a luxury brand needs aspirational creators; a streetwear brand needs authentic subcultural voices. Return a JSON array of the top 5 creators with fields: handle, recipientId (use handle as placeholder), reason.",
+              "promptTemplate": "Brand profile:\n- Name: {{$.steps.brand-research.title}}\n- Description: {{$.steps.brand-research.description}}\n- Tone: {{$.steps.brand-research.tone}}\n- Target audience: {{$.steps.brand-research.targetAudience}}\n- Niche/hashtag: {{$.input.niche}}\n\nUsing the search-instagram-creators tool, find creators posting in this niche. Then use instagram-profile to vet the top candidates. Return a JSON array of the 5 best fits with: handle, recipientId, followerCount, engagementSignal, reason.",
+              "tools": [
+                {
+                  "name": "search-instagram-creators",
+                  "type": "builtin",
+                  "builtinId": "search-instagram-creators",
+                  "description": "Search Instagram hashtag pages to discover creator handles",
+                  "inputSchema": {
+                    "properties": {
+                      "hashtag": { "type": "string", "description": "Hashtag to search without #" },
+                      "limit": { "type": "number", "description": "Max handles to return" }
+                    }
+                  }
+                },
+                {
+                  "name": "instagram-profile",
+                  "type": "builtin",
+                  "builtinId": "instagram-profile",
+                  "description": "Fetch public Instagram profile data for a creator handle",
+                  "inputSchema": {
+                    "properties": {
+                      "handle": { "type": "string", "description": "Instagram username without @" }
+                    }
+                  }
+                }
+              ]
+            },
+            "onSuccess": "send-dms",
+            "retryPolicy": { "maximumAttempts": 2, "initialInterval": "3s" }
+          },
+          {
+            "ref": "send-dms",
+            "type": "agent",
+            "name": "Send Personalised DMs",
+            "position": 3,
+            "config": {
+              "agentName": "ugcOutreachAgent",
+              "systemPrompt": "You are a brand partnerships manager at a fashion brand. Your DMs are warm, specific, non-spammy, and feel personal. You reference something real about each creator's content. Never use generic templates. Match the brand's tone exactly — luxury brands are sophisticated and exclusive; streetwear brands are casual and culturally plugged-in.",
+              "promptTemplate": "Brand profile:\n- Name: {{$.steps.brand-research.title}}\n- Tone: {{$.steps.brand-research.tone}}\n- Values: {{$.steps.brand-research.values}}\n- Products: {{$.steps.brand-research.products}}\n\nCreators to contact:\n{{$.steps.find-creators.text}}\n\nFor each creator in the list, call send-instagram-dm with a personalised message. The message should:\n1. Reference the brand by name\n2. Mention something specific about why this creator fits\n3. Propose a collaboration (gifting, paid partnership, or UGC brief)\n4. Keep it under 200 characters — DM length limit\n5. Match the brand tone perfectly",
+              "tools": [
+                {
+                  "name": "send-instagram-dm",
+                  "type": "builtin",
+                  "builtinId": "send-instagram-dm",
+                  "description": "Send a direct message to an Instagram user via the Graph API",
+                  "inputSchema": {
+                    "properties": {
+                      "recipientId": { "type": "string", "description": "Instagram user ID" },
+                      "message": { "type": "string", "description": "Message text under 200 chars" }
+                    }
+                  }
+                }
+              ]
+            },
+            "retryPolicy": { "maximumAttempts": 1 }
+          }
+        ]
+      }
+    },
+    {
+      "id": "trend-to-copy",
+      "name": "Trend-to-Copy Generator",
+      "description": "Scrapes the brand site and trend sources, then generates on-brand product descriptions and social captions tailored to the brand's voice.",
+      "skills": ["brand-intelligence", "trend-research", "copy-generation"],
+      "flow": {
+        "steps": [
+          {
+            "ref": "trigger",
+            "type": "trigger/manual",
+            "name": "Start",
+            "position": 0,
+            "config": {
+              "inputSchema": {
+                "properties": {
+                  "websiteUrl": { "type": "string", "description": "Brand website URL" },
+                  "trendUrl": { "type": "string", "description": "Trend/editorial URL to draw inspiration from (e.g. Vogue runway page, Highsnobiety article)" },
+                  "productName": { "type": "string", "description": "Name of the product to write copy for" },
+                  "productCategory": { "type": "string", "description": "e.g. jacket, sneaker, dress" }
+                }
+              }
+            },
+            "onSuccess": "brand-research",
+            "retryPolicy": { "maximumAttempts": 1 }
+          },
+          {
+            "ref": "brand-research",
+            "type": "brand-research",
+            "name": "Brand Intelligence",
+            "position": 1,
+            "config": {},
+            "onSuccess": "scrape-trends",
+            "retryPolicy": { "maximumAttempts": 2, "initialInterval": "2s" }
+          },
+          {
+            "ref": "scrape-trends",
+            "type": "agent",
+            "name": "Scrape Trend Context",
+            "position": 2,
+            "config": {
+              "agentName": "trendResearchAgent",
+              "systemPrompt": "You are a fashion trend analyst. Scrape the given URL and extract: key aesthetic trends, colour palette references, cultural references, styling notes, and relevant keywords. Return structured JSON with fields: trends (array of strings), colours (array), culturalRefs (array), keywords (array), summary (string).",
+              "promptTemplate": "Scrape this trend/editorial URL and extract fashion trend signals:\n\nURL: {{$.input.trendUrl}}\n\nUse the scrape-url tool then structure your findings as JSON with: trends, colours, culturalRefs, keywords, summary.",
+              "tools": [
+                {
+                  "name": "scrape-url",
+                  "type": "builtin",
+                  "builtinId": "scrape-url",
+                  "description": "Fetch and extract readable text from any public URL",
+                  "inputSchema": {
+                    "properties": {
+                      "url": { "type": "string", "description": "URL to scrape" }
+                    }
+                  }
+                }
+              ]
+            },
+            "onSuccess": "generate-copy",
+            "retryPolicy": { "maximumAttempts": 2, "initialInterval": "2s" }
+          },
+          {
+            "ref": "generate-copy",
+            "type": "agent",
+            "name": "Generate On-Brand Copy",
+            "position": 3,
+            "config": {
+              "agentName": "copywriterAgent",
+              "systemPrompt": "You are a senior fashion copywriter. You write product descriptions and social captions that feel unmistakably on-brand. You never use generic fashion clichés like 'effortlessly chic' or 'elevate your look'. You study the brand's voice, incorporate relevant cultural references, and write copy that the brand's actual customers would stop scrolling for. Luxury copy is precise, sparse, and evocative. Streetwear copy is punchy, reference-dense, and culturally sharp.",
+              "promptTemplate": "Write marketing copy for {{$.input.productName}} ({{$.input.productCategory}}).\n\nBrand profile:\n- Name: {{$.steps.brand-research.title}}\n- Description: {{$.steps.brand-research.description}}\n- Tone: {{$.steps.brand-research.tone}}\n- Target audience: {{$.steps.brand-research.targetAudience}}\n- Values: {{$.steps.brand-research.values}}\n\nTrend context (from {{$.input.trendUrl}}):\n{{$.steps.scrape-trends.text}}\n\nDeliver:\n1. PRODUCT DESCRIPTION (150-200 words) — for the PDP. Match the brand voice exactly.\n2. INSTAGRAM CAPTION (under 150 chars + 5 hashtags) — punchy, brand-appropriate, scroll-stopping.\n3. EMAIL SUBJECT LINE (under 50 chars) — for a launch email. A/B test: give 2 options.\n4. REASONING (2-3 sentences) — why these copy choices fit this specific brand and trend moment.\n\nNo hedging. Write like you'd stake your agency's reputation on it.",
+              "tools": []
+            },
+            "retryPolicy": { "maximumAttempts": 2, "initialInterval": "2s" }
+          }
+        ]
+      }
+    }
+  ]
+}

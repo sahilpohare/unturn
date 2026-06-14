@@ -1,0 +1,40 @@
+{
+  "stores": [
+    {
+      "id": "jacquemus",
+      "name": "Jacquemus",
+      "websiteUrl": "https://www.jacquemus.com",
+      "identity": "High-end minimalist French luxury. Sun-drenched Mediterranean aesthetic. Architectural silhouettes, playful proportions, surreal minimalism. Simon Porte Jacquemus built the brand through storytelling and emotional warmth — unusual for luxury. Target: aspirational millennials and Gen Z with disposable income.",
+      "runs": {
+        "ugc-creator-outreach": {
+          "websiteUrl": "https://www.jacquemus.com",
+          "niche": "luxuryfashion"
+        },
+        "trend-to-copy": {
+          "websiteUrl": "https://www.jacquemus.com",
+          "trendUrl": "https://www.vogue.com/fashion-shows/spring-2025-ready-to-wear/jacquemus",
+          "productName": "Le Bambino Long",
+          "productCategory": "handbag"
+        }
+      }
+    },
+    {
+      "id": "palace-skateboards",
+      "name": "Palace Skateboards",
+      "websiteUrl": "https://www.palaceskateboards.com",
+      "identity": "London streetwear and skate brand. Founded 2009 by Lev Tanju. Irreverent, deliberately ugly-funny graphics, deep UK skate culture roots. Collaborates with Reebok, Ralph Lauren, Oakley. Fiercely loyal community. Anti-hype hype brand — drops sell out in seconds but the brand actively trolls hype culture. Target: UK/global skate community, 16-28 streetwear obsessives.",
+      "runs": {
+        "ugc-creator-outreach": {
+          "websiteUrl": "https://www.palaceskateboards.com",
+          "niche": "skateboardingfashion"
+        },
+        "trend-to-copy": {
+          "websiteUrl": "https://www.palaceskateboards.com",
+          "trendUrl": "https://www.highsnobiety.com/tag/palace/",
+          "productName": "Tri-Ferg Bomber",
+          "productCategory": "jacket"
+        }
+      }
+    }
+  ]
+}
