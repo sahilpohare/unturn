@@ -1,6 +1,6 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import type { Auth } from '../auth/auth.instance';
 import { AUTH_INSTANCE } from '../auth/auth-infra.module';
 import { TenantEntity } from './tenant.entity';
@@ -24,7 +24,6 @@ export class TenantService {
   constructor(
     @Inject(AUTH_INSTANCE) private readonly auth: Auth,
     @InjectRepository(TenantEntity) private readonly tenantRepo: Repository<TenantEntity>,
-    private readonly dataSource: DataSource,
   ) {}
 
   async create(dto: CreateTenantDto) {
@@ -69,17 +68,16 @@ export class TenantService {
   }
 
   /**
-   * Lists tenants for a user by joining better-auth member/organization tables
-   * (same DB), then mapping slugs to internal tenant UUIDs. Auto-creates
-   * tenant rows for orgs that were created before this mapping existed.
+   * Lists tenants for a user via the better-auth API, then maps slugs to
+   * internal tenant UUIDs. Auto-creates tenant rows for orgs that were
+   * created before this mapping existed.
    */
   async listForUser(userId: string): Promise<{ id: string; name: string; slug: string }[]> {
-    const orgs: { name: string; slug: string }[] = await this.dataSource.query(
-      `SELECT o.name, o.slug FROM "organization" o
-       JOIN "member" m ON m."organizationId" = o.id
-       WHERE m."userId" = $1`,
-      [userId],
-    );
+    const result = await (this.auth.api.listOrganizations as any)({
+      query: { userId },
+    }).catch(() => null);
+
+    const orgs: { name: string; slug: string }[] = Array.isArray(result) ? result : [];
     if (!orgs.length) return [];
 
     for (const org of orgs) {
@@ -95,6 +93,18 @@ export class TenantService {
       .where('t.slug IN (:...slugs)', { slugs })
       .select(['t.id', 't.name', 't.slug'])
       .getMany();
+  }
+
+  /**
+   * Returns tier and raw credentials for internal use by the flow engine.
+   * Never expose this to the frontend — use getCredentials() for that.
+   */
+  async getTierAndCredentials(tenantId: string): Promise<{ tier: string; credentials: Record<string, string> }> {
+    const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
+    return {
+      tier: tenant?.tier ?? 'free',
+      credentials: tenant?.credentials ?? {},
+    };
   }
 
   /**

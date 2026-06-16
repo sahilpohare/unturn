@@ -10,6 +10,6 @@ import { TenantEntity } from './tenant/tenant.entity';
   imports: [AuthInfraModule, TypeOrmModule.forFeature([TenantEntity])],
   providers: [TenantService],
   controllers: [TenantController, UserController],
-  exports: [AuthInfraModule], // so other modules can use session guards
+  exports: [AuthInfraModule, TenantService], // so other modules can use session guards and tenant data
 })
 export class PlatformModule {}

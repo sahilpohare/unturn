@@ -11,10 +11,10 @@ import { v4 as uuid } from 'uuid';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { WorkflowNotFoundError } from '@temporalio/client';
 import { TenantContextService } from '../platform/rls/tenant-context.service';
+import { TenantService } from '../platform/tenant/tenant.service';
 import { TemporalService } from '../temporal/temporal.service';
 import { FlowEntity, FlowStatus } from './flow.entity';
 import { StepEntity, StepType, StepConfig } from './step.entity';
-import { TenantEntity } from '../platform/tenant/tenant.entity';
 import { FlowSnapshot, FlowWorkflowInput } from './flow.types';
 import { contextQuery } from '../temporal/workflows/flow-interpreter.workflow';
 import { taskQueueForTenant } from './flow.constants';
@@ -76,10 +76,8 @@ export class FlowService {
     @InjectRepository(StepEntity)
     private readonly stepRepo: Repository<StepEntity>,
 
-    @InjectRepository(TenantEntity)
-    private readonly tenantRepo: Repository<TenantEntity>,
-
     private readonly tenantCtx: TenantContextService,
+    private readonly tenantService: TenantService,
     private readonly temporal: TemporalService,
   ) {}
 
@@ -193,10 +191,8 @@ export class FlowService {
     const tenantId = this.tenantCtx.getOrThrow();
     const workflowId = `flow-${flow.id}-${uuid()}`;
 
-    const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
-    const tier = tenant?.tier ?? 'free';
+    const { tier, credentials } = await this.tenantService.getTierAndCredentials(tenantId);
     const taskQueue = taskQueueForTenant(tier, tenantId);
-    const credentials = tenant?.credentials ?? {};
 
     const snapshot: FlowSnapshot = {
       id: flow.id,
@@ -290,6 +286,17 @@ export class FlowService {
   // ── Webhook trigger ────────────────────────────────────────────────────────
 
   /**
+   * Loads a flow with its steps by (tenantId, flowId) without requiring a
+   * TenantContext session. Used by the public webhook path.
+   */
+  private async loadFlowForWebhook(tenantId: string, flowId: string): Promise<FlowEntity> {
+    const flow = await this.flowRepo.findOne({ where: { id: flowId, tenantId } });
+    if (!flow) throw new NotFoundException(`Flow ${flowId} not found`);
+    flow.steps = await this.stepRepo.find({ where: { flowId }, order: { position: 'ASC' } });
+    return flow;
+  }
+
+  /**
    * Called from the public webhook endpoint. No session context — the flow
    * is loaded by (tenantId, flowId) pair directly from the DB. HMAC-SHA256
    * signature is verified before execution to authenticate the caller.
@@ -303,18 +310,11 @@ export class FlowService {
     signature: string | undefined,
     payload: Record<string, unknown>,
   ): Promise<{ workflowId: string }> {
-    // Load flow bypassing TenantContextService (no session)
-    const flow = await this.flowRepo.findOne({ where: { id: flowId, tenantId } });
-    if (!flow) throw new NotFoundException(`Flow ${flowId} not found`);
+    const flow = await this.loadFlowForWebhook(tenantId, flowId);
 
     if (flow.status !== 'active') {
       throw new BadRequestException(`Flow "${flow.name}" is not active`);
     }
-
-    flow.steps = await this.stepRepo.find({
-      where: { flowId },
-      order: { position: 'ASC' },
-    });
 
     const triggerStep = flow.steps.find((s) => s.type.startsWith('trigger/'));
     const triggerConfig = triggerStep?.config as WebhookTriggerConfig | undefined;
@@ -332,10 +332,8 @@ export class FlowService {
       }
     }
 
-    const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
-    const tier = tenant?.tier ?? 'free';
+    const { tier, credentials } = await this.tenantService.getTierAndCredentials(tenantId);
     const taskQueue = taskQueueForTenant(tier, tenantId);
-    const credentials = tenant?.credentials ?? {};
     const workflowId = `flow-${flow.id}-${uuid()}`;
 
     const snapshot: FlowSnapshot = {
